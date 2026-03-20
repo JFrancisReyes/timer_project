@@ -3,6 +3,9 @@
 #include <Keypad.h>
 #include <RTClib.h>
 
+// Create a second I2C bus for RTC
+TwoWire I2C_RTC = TwoWire(1);
+
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 RTC_DS3231 rtc;
 
@@ -54,12 +57,20 @@ Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);
 
 void setup() {
   Serial.begin(115200);
-  Wire.begin(18, 19);  // SDA on GPIO 18, SCL on GPIO 19 for DS3231
+  
+  // Initialize I2C Bus 0 for LCD on GPIO 21,22
+  Wire.begin(21, 22);
+  
+  // Initialize I2C Bus 1 for RTC on GPIO 18,19
+  I2C_RTC.begin(18, 19, 100000);
+  
   lcd.init();
   lcd.backlight();
   
-  // Initialize RTC
-  if (!rtc.begin()) {
+  // Initialize RTC with second I2C bus
+  rtc.begin(&I2C_RTC);
+  
+  if (!rtc.begin(&I2C_RTC)) {
     Serial.println("RTC DS3231 not found!");
   } else {
     Serial.println("RTC DS3231 initialized successfully!");
