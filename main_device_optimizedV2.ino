@@ -54,10 +54,17 @@ Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);
 
 void setup() {
   Serial.begin(115200);
-  Wire.begin(21, 22);
+  Wire.begin(18, 19);  // SDA on GPIO 18, SCL on GPIO 19 for DS3231
   lcd.init();
   lcd.backlight();
-  rtc.begin();
+  
+  // Initialize RTC
+  if (!rtc.begin()) {
+    Serial.println("RTC DS3231 not found!");
+  } else {
+    Serial.println("RTC DS3231 initialized successfully!");
+  }
+  
   SubSerial.begin(115200, SERIAL_8N1, RX_SUB, TX_SUB);
   pinMode(BUZZER, OUTPUT);
   loadClockDigits();
