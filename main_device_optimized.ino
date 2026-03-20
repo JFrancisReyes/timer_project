@@ -1,0 +1,320 @@
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+#include <Keypad.h>
+#include <RTClib.h>
+
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+RTC_DS3231 rtc;
+
+HardwareSerial SubSerial(2);
+
+#define TX_SUB 17
+#define RX_SUB 16
+#define BUZZER 4
+
+int timerDigits[4] = {0, 0, 0, 0};
+int clockDigits[4] = {0, 0, 0, 0};
+
+int cursorPos = 0;
+
+bool settingMode = false;
+bool displayClock = false;
+bool timerRunning = false;
+
+long remainingSeconds = 0;
+unsigned long lastSecond = 0;
+
+bool blinkState = true;
+unsigned long blinkTimer = 0;
+const int blinkInterval = 600;
+
+const byte ROWS = 4;
+const byte COLS = 4;
+
+char keys[ROWS][COLS] = {
+  {'1', '2', '3', 'A'},
+  {'4', '5', '6', 'B'},
+  {'7', '8', '9', 'C'},
+  {'*', '0', '#', 'D'}
+};
+
+byte rowPins[ROWS] = {13, 12, 14, 27};
+byte colPins[COLS] = {26, 25, 33, 32};
+
+Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);
+
+void setup() {
+  Serial.begin(115200);
+  Wire.begin(21, 22);
+  lcd.init();
+  lcd.backlight();
+  rtc.begin();
+  SubSerial.begin(115200, SERIAL_8N1, RX_SUB, TX_SUB);
+  pinMode(BUZZER, OUTPUT);
+  loadClockDigits();
+}
+
+void loop() {
+  readKeypad();
+  updateBlink();
+  updateTimer();
+  updateLCD();
+  sendToSubsystem();
+}
+
+void updateBlink() {
+  if (millis() - blinkTimer > blinkInterval) {
+    blinkTimer = millis();
+    blinkState = !blinkState;
+  }
+}
+
+void readKeypad() {
+  char key = keypad.getKey();
+  if (!key) return;
+
+  // Numeric input: 0-9
+  if (key >= '0' && key <= '9' && settingMode) {
+    int value = key - '0';
+
+    if (displayClock) {
+      if (validClockDigit(cursorPos, value)) {
+        clockDigits[cursorPos] = value;
+        moveCursorRight();
+      }
+    } else {
+      if (validTimerDigit(cursorPos, value)) {
+        timerDigits[cursorPos] = value;
+        moveCursorRight();
+      }
+    }
+  }
+
+  if (key == '*' && settingMode) moveCursorLeft();
+  if (key == '#' && settingMode) moveCursorRight();
+
+  // Timer control: Start/Pause
+  if (key == 'A' && !displayClock) {
+    if (!timerRunning) {
+      // FIX: Only calculate from digits if starting fresh (remainingSeconds is 0)
+      // This prevents losing the seconds component when resuming from pause
+      if (remainingSeconds == 0) {
+        remainingSeconds = getTimerSeconds();
+      }
+      lastSecond = millis();  // Reset timing reference for accurate countdown
+    }
+    timerRunning = !timerRunning;
+  }
+
+  // Reset timer
+  if (key == 'B') {
+    timerRunning = false;
+    remainingSeconds = 0;
+    for (int i = 0; i < 4; i++) timerDigits[i] = 0;
+    digitalWrite(BUZZER, LOW);
+  }
+
+  // Toggle editing mode
+  if (key == 'C') {
+    if (settingMode && displayClock) saveClock();
+    settingMode = !settingMode;
+
+    if (settingMode) {
+      cursorPos = 0;
+      if (displayClock) loadClockDigits();
+    }
+  }
+
+  // Switch between clock and timer display
+  if (key == 'D') {
+    displayClock = !displayClock;
+  }
+}
+
+void loadClockDigits() {
+  DateTime now = rtc.now();
+  clockDigits[0] = now.hour() / 10;
+  clockDigits[1] = now.hour() % 10;
+  clockDigits[2] = now.minute() / 10;
+  clockDigits[3] = now.minute() % 10;
+}
+
+void saveClock() {
+  DateTime now = rtc.now();
+  int h = clockDigits[0] * 10 + clockDigits[1];
+  int m = clockDigits[2] * 10 + clockDigits[3];
+  rtc.adjust(DateTime(now.year(), now.month(), now.day(), h, m, 0));
+}
+
+bool validTimerDigit(int pos, int value) {
+  if (pos == 0) return value <= 2;
+  if (pos == 1) {
+    if (timerDigits[0] == 2) return value <= 3;
+    return true;
+  }
+  if (pos == 2) return value <= 5;
+  return true;
+}
+
+bool validClockDigit(int pos, int value) {
+  if (pos == 0) return value <= 2;
+  if (pos == 1) {
+    if (clockDigits[0] == 2) return value <= 3;
+    return true;
+  }
+  if (pos == 2) return value <= 5;
+  return true;
+}
+
+void moveCursorRight() {
+  cursorPos++;
+  if (cursorPos > 3) cursorPos = 3;
+}
+
+void moveCursorLeft() {
+  cursorPos--;
+  if (cursorPos < 0) cursorPos = 0;
+}
+
+long getTimerSeconds() {
+  int h = timerDigits[0] * 10 + timerDigits[1];
+  int m = timerDigits[2] * 10 + timerDigits[3];
+  return h * 3600L + m * 60L;  // Using long literals for safety
+}
+
+// Convert 24-hour format to 12-hour format
+void convert24to12(int hour24, int &hour12, bool &isPM) {
+  isPM = (hour24 >= 12);
+  if (hour24 == 0) {
+    hour12 = 12;  // Midnight is 12:00 AM
+  } else if (hour24 <= 12) {
+    hour12 = hour24;
+  } else {
+    hour12 = hour24 - 12;  // 13:00 becomes 01:00 PM
+  }
+}
+
+void updateTimer() {
+  if (!timerRunning) return;
+
+  if (millis() - lastSecond >= 1000) {
+    lastSecond += 1000;
+
+    if (remainingSeconds > 0) {
+      remainingSeconds--;
+
+      // Update display digits based on remaining time
+      int h = remainingSeconds / 3600;
+      int m = (remainingSeconds % 3600) / 60;
+
+      timerDigits[0] = h / 10;
+      timerDigits[1] = h % 10;
+      timerDigits[2] = m / 10;
+      timerDigits[3] = m % 10;
+    } else {
+      timerRunning = false;
+      digitalWrite(BUZZER, HIGH);
+    }
+  }
+}
+
+void printDigit(int pos, int value) {
+  int lcdPos[4] = {2, 3, 5, 6};
+  lcd.setCursor(lcdPos[pos], 0);
+
+  if (settingMode && pos == cursorPos && !blinkState)
+    lcd.print(" ");
+  else
+    lcd.print(value);
+}
+
+void updateLCD() {
+  lcd.setCursor(0, 0);
+
+  if (displayClock) {
+    DateTime now = rtc.now();
+
+    lcd.print("C ");
+
+    int h = settingMode ? clockDigits[0] * 10 + clockDigits[1] : now.hour();
+    int m = settingMode ? clockDigits[2] * 10 + clockDigits[3] : now.minute();
+
+    // Convert to 12-hour format
+    int h12;
+    bool isPM;
+    convert24to12(h, h12, isPM);
+
+    printDigit(0, h12 / 10);
+    printDigit(1, h12 % 10);
+
+    lcd.setCursor(4, 0);
+    lcd.print(":");
+
+    printDigit(2, m / 10);
+    printDigit(3, m % 10);
+
+    lcd.print(":");
+
+    if (now.second() < 10) lcd.print("0");
+    lcd.print(now.second());
+
+    // Display AM/PM indicator
+    lcd.setCursor(14, 0);
+    lcd.print(isPM ? "P" : "A");
+  } else {
+    lcd.print("T ");
+
+    printDigit(0, timerDigits[0]);
+    printDigit(1, timerDigits[1]);
+
+    lcd.setCursor(4, 0);
+    lcd.print(":");
+
+    printDigit(2, timerDigits[2]);
+    printDigit(3, timerDigits[3]);
+
+    lcd.print(":");
+
+    int sec = remainingSeconds % 60;
+
+    if (sec < 10) lcd.print("0");
+    lcd.print(sec);
+
+    lcd.setCursor(15, 0);
+
+    if (timerRunning) lcd.print("G");
+    else lcd.print("P");
+  }
+}
+
+void sendToSubsystem() {
+  char buffer[10];
+  int d0, d1, d2, d3;
+
+  if (displayClock) {
+    if (settingMode) {
+      d0 = clockDigits[0];
+      d1 = clockDigits[1];
+      d2 = clockDigits[2];
+      d3 = clockDigits[3];
+    } else {
+      DateTime now = rtc.now();
+      // Convert to 12-hour format for subsystem display
+      int h12;
+      bool isPM;
+      convert24to12(now.hour(), h12, isPM);
+      d0 = h12 / 10;
+      d1 = h12 % 10;
+      d2 = now.minute() / 10;
+      d3 = now.minute() % 10;
+    }
+  } else {
+    d0 = timerDigits[0];
+    d1 = timerDigits[1];
+    d2 = timerDigits[2];
+    d3 = timerDigits[3];
+  }
+
+  sprintf(buffer, "%d%d%d%d%d%d\n", d0, d1, d2, d3, settingMode, cursorPos);
+  SubSerial.print(buffer);
+}
