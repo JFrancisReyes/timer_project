@@ -14,9 +14,11 @@ HardwareSerial SubSerial(2);
 #define TX_SUB 17
 #define RX_SUB 16
 #define BUZZER 4
+#define RTC_AM_PM_ADDRESS 12
 
 int timerDigits[4] = {0, 0, 0, 0};
 int clockDigits[4] = {0, 0, 0, 0};
+bool clockPM = false;
 
 int cursorPos = 0;
 
@@ -101,12 +103,20 @@ void readKeypad() {
   char key = keypad.getKey();
   if (!key) return;
 
-  // Numeric input: 0-9
+  // Numeric input: 0-9 OR AM/PM selection (1=AM, 2=PM)
   if (key >= '0' && key <= '9' && settingMode) {
     int value = key - '0';
 
     if (displayClock) {
-      if (validClockDigit(cursorPos, value)) {
+      // Position 4 is AM/PM selector - only allow 1 (AM) or 2 (PM)
+      if (cursorPos == 4) {
+        if (key == '1') {
+          clockPM = false;  // 1 = AM
+        } else if (key == '2') {
+          clockPM = true;   // 2 = PM
+        }
+        // Don't move cursor for AM/PM selection
+      } else if (validClockDigit(cursorPos, value)) {
         clockDigits[cursorPos] = value;
         moveCursorRight();
       }
@@ -166,6 +176,9 @@ void loadClockDigits() {
   clockDigits[1] = now.hour() % 10;
   clockDigits[2] = now.minute() / 10;
   clockDigits[3] = now.minute() % 10;
+  
+  // Load AM/PM setting from RTC RAM
+  clockPM = rtc.readnvram(RTC_AM_PM_ADDRESS) != 0;
 }
 
 void saveClock() {
@@ -173,6 +186,9 @@ void saveClock() {
   int h = clockDigits[0] * 10 + clockDigits[1];
   int m = clockDigits[2] * 10 + clockDigits[3];
   rtc.adjust(DateTime(now.year(), now.month(), now.day(), h, m, 0));
+  
+  // Save AM/PM setting to RTC RAM (address 12)
+  rtc.writenvram(RTC_AM_PM_ADDRESS, clockPM ? 1 : 0);
 }
 
 bool validTimerDigit(int pos, int value) {
@@ -186,6 +202,9 @@ bool validTimerDigit(int pos, int value) {
 }
 
 bool validClockDigit(int pos, int value) {
+  // Position 4 is AM/PM selector - not a regular digit
+  if (pos == 4) return false;
+  
   if (pos == 0) return value <= 2;
   if (pos == 1) {
     if (clockDigits[0] == 2) return value <= 3;
@@ -197,7 +216,7 @@ bool validClockDigit(int pos, int value) {
 
 void moveCursorRight() {
   cursorPos++;
-  if (cursorPos > 3) cursorPos = 3;
+  if (cursorPos > 4) cursorPos = 4;  // Max position now 4 (for AM/PM)
 }
 
 void moveCursorLeft() {
@@ -272,6 +291,9 @@ void updateLCD() {
     int h12;
     bool isPM;
     convert24to12(h, h12, isPM);
+    
+    // Use editable clockPM if in setting mode, otherwise use actual isPM
+    if (settingMode) isPM = clockPM;
 
     printDigit(0, h12 / 10);
     printDigit(1, h12 % 10);
@@ -287,9 +309,16 @@ void updateLCD() {
     if (now.second() < 10) lcd.print("0");
     lcd.print(now.second());
 
-    // Display AM/PM indicator
-    lcd.setCursor(14, 0);
-    lcd.print(isPM ? "P" : "A");
+    // Display AM/PM at positions 12-13 with blinking support
+    lcd.setCursor(12, 0);
+    
+    if (settingMode && cursorPos == 4 && !blinkState) {
+      lcd.print(" ");  // Blinking cursor on AM/PM
+    } else {
+      lcd.print(isPM ? "P" : "A");
+    }
+    
+    lcd.print("M");  // Static "M"
   } else {
     lcd.print("T ");
 
