@@ -89,6 +89,11 @@ void resetAllStates() {
   }
   bufferIndex = 0;
   
+  // Flush any pending serial data
+  while (Serial2.available()) {
+    Serial2.read();  // Clear the buffer
+  }
+  
   // Clear all displays
   for (int i = 0; i < 4; i++) {
     digitalWrite(displayPins[i].A, LOW);
