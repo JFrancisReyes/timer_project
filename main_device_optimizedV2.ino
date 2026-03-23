@@ -123,6 +123,11 @@ bool alert1MinTriggered = false;
 unsigned long lastClockEditTime = 0;
 int lastTrackedHour = -1;  // Track last hour to detect transitions
 
+// Keypad debouncing to prevent spurious inputs from power noise
+char lastValidKey = 0;
+unsigned long lastKeyTime = 0;
+const unsigned long KEY_DEBOUNCE_MS = 80;  // Minimum 80ms between valid key presses
+
 const byte ROWS = 4;
 const byte COLS = 4;
 
@@ -173,6 +178,21 @@ void setup() {
 }
 
 void loop() {
+  // SAFETY CHECK: Ensure cursor positions never go out of bounds
+  if (displayClock) {
+    if (clockCursorPos < 0 || clockCursorPos > 4) {
+      Serial.println("WARNING: clockCursorPos out of bounds! Resetting to 0");
+      clockCursorPos = 0;
+    }
+    cursorPos = clockCursorPos;
+  } else {
+    if (timerCursorPos < 0 || timerCursorPos > 3) {
+      Serial.println("WARNING: timerCursorPos out of bounds! Resetting to 0");
+      timerCursorPos = 0;
+    }
+    cursorPos = timerCursorPos;
+  }
+  
   readKeypad();
   updateBlink();
   updateTimer();
@@ -223,6 +243,13 @@ void resetAllStates() {
   
   // Timing references
   lastSecond = millis();
+  lastClockEditTime = 0;
+  
+  // Clear keypad buffer by consuming all pending keys
+  char dummyKey;
+  while ((dummyKey = keypad.getKey())) {
+    // Just clear the buffer
+  }
   
   // AM/PM (load from EEPROM - not reset)
   // clockPM is preserved from EEPROM
@@ -240,6 +267,27 @@ void updateBlink() {
 void readKeypad() {
   char key = keypad.getKey();
   if (!key) return;
+  
+  // DEBOUNCING: Ignore if same key pressed too quickly or if key is invalid
+  unsigned long currentTime = millis();
+  
+  // Only accept valid keys: digits, *, #, and A/B/C/D
+  bool isValidKey = (key >= '0' && key <= '9') || key == '*' || key == '#' || 
+                    key == 'A' || key == 'B' || key == 'C' || key == 'D';
+  
+  if (!isValidKey) {
+    Serial.print("INVALID KEY DETECTED: ");
+    Serial.println(key);
+    return;  // Reject invalid keys (garbage from power noise)
+  }
+  
+  // Debounce: ignore if this key was just pressed
+  if (lastValidKey == key && (currentTime - lastKeyTime < KEY_DEBOUNCE_MS)) {
+    return;  // Ignore duplicate rapid presses
+  }
+  
+  lastValidKey = key;
+  lastKeyTime = currentTime;
 
   // Numeric input: 0-9 OR AM/PM selection (1=AM, 2=PM)
   if (key >= '0' && key <= '9' && settingMode) {
@@ -381,9 +429,19 @@ void loadClockDigits() {
   clockDigits[2] = now.minute() / 10;
   clockDigits[3] = now.minute() % 10;
   
-  // Load AM/PM setting from EEPROM
+  // Load AM/PM setting from EEPROM with validation
   EEPROM.begin(512);  // Initialize EEPROM (512 bytes)
-  clockPM = EEPROM.read(EEPROM_AM_PM_ADDRESS) != 0;
+  int eepromValue = EEPROM.read(EEPROM_AM_PM_ADDRESS);
+  
+  // Validate EEPROM: if corrupted (not 0 or 1), reset to 0 (AM)
+  if (eepromValue != 0 && eepromValue != 1) {
+    Serial.println("EEPROM corrupted! Resetting AM/PM to AM (0)");
+    EEPROM.write(EEPROM_AM_PM_ADDRESS, 0);
+    EEPROM.commit();
+    clockPM = false;
+  } else {
+    clockPM = (eepromValue != 0);
+  }
 }
 
 void saveClock() {
