@@ -21,7 +21,9 @@ int timerDigits[4] = {0, 0, 0, 0};
 int clockDigits[4] = {0, 0, 0, 0};
 bool clockPM = false;
 
-int cursorPos = 0;
+int clockCursorPos = 0;  // Cursor position for clock mode (0-4)
+int timerCursorPos = 0;  // Cursor position for timer mode (0-3)
+int cursorPos = 0;       // Active cursor position (mirror of clock or timer)
 
 bool settingMode = false;
 bool displayClock = false;
@@ -110,21 +112,20 @@ void readKeypad() {
 
     if (displayClock) {
       // Position 4 is AM/PM selector - only allow 1 (AM) or 2 (PM)
-      if (cursorPos == 4) {
+      if (clockCursorPos == 4) {
         if (key == '1') {
           clockPM = false;  // 1 = AM
         } else if (key == '2') {
           clockPM = true;   // 2 = PM
         }
-        // Don't move cursor for AM/PM selection
-      } else if (validClockDigit(cursorPos, value)) {
-        clockDigits[cursorPos] = value;
+      } else if (validClockDigit(clockCursorPos, value)) {
+        clockDigits[clockCursorPos] = value;
         moveCursorRight();
       }
     } else {
-      // Timer mode - only accept input for positions 0-3
-      if (cursorPos >= 0 && cursorPos <= 3 && validTimerDigit(cursorPos, value)) {
-        timerDigits[cursorPos] = value;
+      // Timer mode - strictly positions 0-3 only
+      if (timerCursorPos >= 0 && timerCursorPos <= 3 && validTimerDigit(timerCursorPos, value)) {
+        timerDigits[timerCursorPos] = value;
         moveCursorRight();
       }
     }
@@ -132,8 +133,6 @@ void readKeypad() {
 
   if (key == '*' && settingMode) moveCursorLeft();
   if (key == '#' && settingMode) moveCursorRight();
-
-  // Timer control: Start/Pause
   if (key == 'A' && !displayClock) {
     if (!timerRunning) {
       // FIX: Only calculate from digits if starting fresh (remainingSeconds is 0)
@@ -161,17 +160,28 @@ void readKeypad() {
     settingMode = !settingMode;
 
     if (settingMode) {
-      cursorPos = 0;
-      if (displayClock) loadClockDigits();
+      // Swap cursor position based on mode
+      if (displayClock) {
+        clockCursorPos = 0;
+        cursorPos = clockCursorPos;
+        loadClockDigits();
+      } else {
+        timerCursorPos = 0;
+        cursorPos = timerCursorPos;
+      }
     }
   }
 
   // Switch between clock and timer display
   if (key == 'D') {
     displayClock = !displayClock;
-    // Reset cursor position and setting mode when switching modes
-    cursorPos = 0;
-    if (settingMode && displayClock) loadClockDigits();
+    // Swap cursor position based on new mode
+    if (displayClock) {
+      cursorPos = clockCursorPos;
+      if (settingMode) loadClockDigits();
+    } else {
+      cursorPos = timerCursorPos;
+    }
   }
 }
 
@@ -223,15 +233,27 @@ bool validClockDigit(int pos, int value) {
 }
 
 void moveCursorRight() {
-  cursorPos++;
-  // Limit based on current mode: timer mode max 3, clock mode max 4
-  int maxPos = displayClock ? 4 : 3;
-  if (cursorPos > maxPos) cursorPos = maxPos;
+  if (displayClock) {
+    clockCursorPos++;
+    if (clockCursorPos > 4) clockCursorPos = 4;
+    cursorPos = clockCursorPos;
+  } else {
+    timerCursorPos++;
+    if (timerCursorPos > 3) timerCursorPos = 3;
+    cursorPos = timerCursorPos;
+  }
 }
 
 void moveCursorLeft() {
-  cursorPos--;
-  if (cursorPos < 0) cursorPos = 0;
+  if (displayClock) {
+    clockCursorPos--;
+    if (clockCursorPos < 0) clockCursorPos = 0;
+    cursorPos = clockCursorPos;
+  } else {
+    timerCursorPos--;
+    if (timerCursorPos < 0) timerCursorPos = 0;
+    cursorPos = timerCursorPos;
+  }
 }
 
 long getTimerSeconds() {
