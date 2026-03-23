@@ -346,6 +346,10 @@ void updateLCD() {
 
     if (timerRunning) lcd.print("G");
     else lcd.print("P");
+    
+    // Clear AM/PM positions (12-13) when in timer mode
+    lcd.setCursor(12, 0);
+    lcd.print("  ");
   }
 }
 
