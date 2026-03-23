@@ -119,6 +119,10 @@ unsigned long patternNoteStart = 0;
 bool alert10MinTriggered = false;
 bool alert1MinTriggered = false;
 
+// Auto-sync grace period for AM/PM
+unsigned long lastClockEditTime = 0;
+const unsigned long CLOCK_EDIT_GRACE_PERIOD = 5000;  // 5 seconds before auto-sync kicks in
+
 const byte ROWS = 4;
 const byte COLS = 4;
 
@@ -189,11 +193,14 @@ void readKeypad() {
       if (clockCursorPos == 4) {
         if (key == '1') {
           clockPM = false;  // 1 = AM
+          lastClockEditTime = millis();  // Reset grace period
         } else if (key == '2') {
           clockPM = true;   // 2 = PM
+          lastClockEditTime = millis();  // Reset grace period
         }
       } else if (validClockDigit(clockCursorPos, value)) {
         clockDigits[clockCursorPos] = value;
+        lastClockEditTime = millis();  // Reset grace period
         moveCursorRight();
       }
     } else {
@@ -267,6 +274,7 @@ void readKeypad() {
     settingMode = !settingMode;
 
     if (settingMode) {
+      lastClockEditTime = millis();  // Start grace period when entering edit mode
       // Pause timer when entering set mode (only in timer mode)
       if (!displayClock && timerRunning) {
         timerRunning = false;
@@ -472,8 +480,8 @@ void updateLCD() {
     bool isPM;
     convert24to12(h, h12, isPM);
     
-    // Auto-sync AM/PM with actual RTC time when not in setting mode
-    if (!settingMode) {
+    // Auto-sync AM/PM with actual RTC time only after grace period (not immediately after editing)
+    if (!settingMode && (millis() - lastClockEditTime > CLOCK_EDIT_GRACE_PERIOD)) {
       clockPM = (now.hour() >= 12);
     }
     
