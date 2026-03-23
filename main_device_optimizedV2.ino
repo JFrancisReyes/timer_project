@@ -46,9 +46,10 @@ bool buzzerActive = false;
 unsigned long buzzerStartTime = 0;
 int buzzerPatternType = 0;  // 0=none, 1=startup, 2=pause, 3=10min, 4=1min, 5=completion
 
-const int LOW_TONE = 600;
-const int HIGH_TONE = 2500;
-const int LOUD_TONE = 3500;
+const int LOW_TONE = 800;
+const int HIGH_TONE = 2800;
+const int LOUD_TONE = 3800;
+const int VERY_LOUD_TONE = 4200;  // For 1-min alert (loudest)
 
 // Buzzer pattern: array of (frequency, duration in ms) pairs, -1 frequency = silence
 struct BuzzerNote {
@@ -77,37 +78,37 @@ BuzzerNote pausePattern[] = {
 const int pausePatternLen = 16;
 
 BuzzerNote alert10MinPattern[] = {
-  {HIGH_TONE, 300}, {-1, 650},
-  {HIGH_TONE, 300}, {-1, 650},
-  {HIGH_TONE, 300}, {-1, 650},
-  {HIGH_TONE, 300}, {-1, 650},
-  {HIGH_TONE, 300}, {-1, 650}
+  {LOUD_TONE, 300}, {-1, 650},
+  {LOUD_TONE, 300}, {-1, 650},
+  {LOUD_TONE, 300}, {-1, 650},
+  {LOUD_TONE, 300}, {-1, 650},
+  {LOUD_TONE, 300}, {-1, 650}
 };
 const int alert10MinPatternLen = 10;
 
 BuzzerNote alert1MinPattern[] = {
-  {HIGH_TONE, 250}, {-1, 350},
-  {HIGH_TONE, 250}, {-1, 350},
-  {HIGH_TONE, 250}, {-1, 350},
-  {HIGH_TONE, 250}, {-1, 350},
-  {HIGH_TONE, 250}, {-1, 350},
-  {HIGH_TONE, 250}, {-1, 350},
-  {HIGH_TONE, 250}, {-1, 350},
-  {HIGH_TONE, 250}, {-1, 350},
-  {HIGH_TONE, 250}, {-1, 350},
-  {HIGH_TONE, 250}, {-1, 350},
-  {LOW_TONE, 300}, {-1, 450},
-  {LOW_TONE, 300}, {-1, 450}
+  {VERY_LOUD_TONE, 250}, {-1, 350},
+  {VERY_LOUD_TONE, 250}, {-1, 350},
+  {VERY_LOUD_TONE, 250}, {-1, 350},
+  {VERY_LOUD_TONE, 250}, {-1, 350},
+  {VERY_LOUD_TONE, 250}, {-1, 350},
+  {VERY_LOUD_TONE, 250}, {-1, 350},
+  {VERY_LOUD_TONE, 250}, {-1, 350},
+  {VERY_LOUD_TONE, 250}, {-1, 350},
+  {VERY_LOUD_TONE, 250}, {-1, 350},
+  {VERY_LOUD_TONE, 250}, {-1, 350},
+  {VERY_LOUD_TONE, 300}, {-1, 450},
+  {VERY_LOUD_TONE, 300}, {-1, 450}
 };
 const int alert1MinPatternLen = 24;
 
 BuzzerNote completionPattern[] = {
-  {HIGH_TONE, 300}, {-1, 400},
-  {HIGH_TONE, 300}, {-1, 500},
+  {LOUD_TONE, 300}, {-1, 400},
+  {LOUD_TONE, 300}, {-1, 500},
   {LOW_TONE, 300}, {-1, 500},
-  {HIGH_TONE, 300}, {-1, 400},
+  {LOUD_TONE, 300}, {-1, 400},
   {LOW_TONE, 300}, {-1, 400},
-  {HIGH_TONE, 300}, {-1, 500}
+  {LOUD_TONE, 300}, {-1, 500}
 };
 const int completionPatternLen = 12;
 
