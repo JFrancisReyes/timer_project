@@ -2,6 +2,7 @@
 #include <LiquidCrystal_I2C.h>
 #include <Keypad.h>
 #include <RTClib.h>
+#include <EEPROM.h>
 
 // Create a second I2C bus for RTC
 TwoWire I2C_RTC = TwoWire(1);
@@ -14,7 +15,7 @@ HardwareSerial SubSerial(2);
 #define TX_SUB 17
 #define RX_SUB 16
 #define BUZZER 4
-#define RTC_AM_PM_ADDRESS 12
+#define EEPROM_AM_PM_ADDRESS 0  // EEPROM address for AM/PM storage
 
 int timerDigits[4] = {0, 0, 0, 0};
 int clockDigits[4] = {0, 0, 0, 0};
@@ -177,8 +178,9 @@ void loadClockDigits() {
   clockDigits[2] = now.minute() / 10;
   clockDigits[3] = now.minute() % 10;
   
-  // Load AM/PM setting from RTC RAM
-  clockPM = rtc.readnvram(RTC_AM_PM_ADDRESS) != 0;
+  // Load AM/PM setting from EEPROM
+  EEPROM.begin(512);  // Initialize EEPROM (512 bytes)
+  clockPM = EEPROM.read(EEPROM_AM_PM_ADDRESS) != 0;
 }
 
 void saveClock() {
@@ -187,8 +189,10 @@ void saveClock() {
   int m = clockDigits[2] * 10 + clockDigits[3];
   rtc.adjust(DateTime(now.year(), now.month(), now.day(), h, m, 0));
   
-  // Save AM/PM setting to RTC RAM (address 12)
-  rtc.writenvram(RTC_AM_PM_ADDRESS, clockPM ? 1 : 0);
+  // Save AM/PM setting to EEPROM
+  EEPROM.begin(512);  // Initialize EEPROM (512 bytes)
+  EEPROM.write(EEPROM_AM_PM_ADDRESS, clockPM ? 1 : 0);
+  EEPROM.commit();  // Commit changes to flash
 }
 
 bool validTimerDigit(int pos, int value) {
