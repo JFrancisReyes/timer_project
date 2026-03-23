@@ -472,7 +472,12 @@ void updateLCD() {
     bool isPM;
     convert24to12(h, h12, isPM);
     
-    // Always use the saved clockPM value (user's choice)
+    // Auto-sync AM/PM with actual RTC time when not in setting mode
+    if (!settingMode) {
+      clockPM = (now.hour() >= 12);
+    }
+    
+    // Use the current clockPM value (auto-synced or manually set during editing)
     isPM = clockPM;
 
     printDigit(0, h12 / 10);
