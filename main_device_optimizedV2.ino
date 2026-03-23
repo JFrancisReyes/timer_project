@@ -47,8 +47,8 @@ unsigned long buzzerStartTime = 0;
 int buzzerPatternType = 0;  // 0=none, 1=startup, 2=pause, 3=10min, 4=1min, 5=completion
 
 const int LOW_TONE = 440;
-const int HIGH_TONE = 1200;
-const int LOUD_TONE = 1500;
+const int HIGH_TONE = 1400;
+const int LOUD_TONE = 2200;
 
 // Buzzer pattern: array of (frequency, duration in ms) pairs, -1 frequency = silence
 struct BuzzerNote {
@@ -58,56 +58,56 @@ struct BuzzerNote {
 
 // Define all buzzer patterns
 BuzzerNote startupPattern[] = {
-  {LOUD_TONE, 250}, {-1, 300},
-  {LOUD_TONE, 250}, {-1, 300},
-  {LOUD_TONE, 250}, {-1, 300}
+  {LOUD_TONE, 300}, {-1, 500},
+  {LOUD_TONE, 300}, {-1, 500},
+  {LOUD_TONE, 300}, {-1, 500}
 };
 const int startupPatternLen = 6;
 
 BuzzerNote pausePattern[] = {
-  {LOW_TONE, 250}, {-1, 150},
-  {HIGH_TONE, 250}, {-1, 150},
-  {LOW_TONE, 250}, {-1, 150},
-  {HIGH_TONE, 250}, {-1, 400},
-  {LOW_TONE, 250}, {-1, 150},
-  {HIGH_TONE, 250}, {-1, 150},
-  {LOW_TONE, 250}, {-1, 150},
-  {HIGH_TONE, 250}, {-1, 150}
+  {LOW_TONE, 300}, {-1, 250},
+  {HIGH_TONE, 300}, {-1, 250},
+  {LOW_TONE, 300}, {-1, 250},
+  {HIGH_TONE, 300}, {-1, 500},
+  {LOW_TONE, 300}, {-1, 250},
+  {HIGH_TONE, 300}, {-1, 250},
+  {LOW_TONE, 300}, {-1, 250},
+  {HIGH_TONE, 300}, {-1, 250}
 };
 const int pausePatternLen = 16;
 
 BuzzerNote alert10MinPattern[] = {
-  {HIGH_TONE, 300}, {-1, 200},
-  {HIGH_TONE, 300}, {-1, 200},
-  {HIGH_TONE, 300}, {-1, 200},
-  {HIGH_TONE, 300}, {-1, 200},
-  {HIGH_TONE, 300}, {-1, 200}
+  {HIGH_TONE, 300}, {-1, 400},
+  {HIGH_TONE, 300}, {-1, 400},
+  {HIGH_TONE, 300}, {-1, 400},
+  {HIGH_TONE, 300}, {-1, 400},
+  {HIGH_TONE, 300}, {-1, 400}
 };
 const int alert10MinPatternLen = 10;
 
 BuzzerNote alert1MinPattern[] = {
-  {HIGH_TONE, 200}, {-1, 100},
-  {HIGH_TONE, 200}, {-1, 100},
-  {HIGH_TONE, 200}, {-1, 100},
-  {HIGH_TONE, 200}, {-1, 100},
-  {HIGH_TONE, 200}, {-1, 100},
-  {HIGH_TONE, 200}, {-1, 100},
-  {HIGH_TONE, 200}, {-1, 100},
-  {HIGH_TONE, 200}, {-1, 100},
-  {HIGH_TONE, 200}, {-1, 100},
-  {HIGH_TONE, 200}, {-1, 100},
-  {LOW_TONE, 300}, {-1, 150},
-  {LOW_TONE, 300}, {-1, 150}
+  {HIGH_TONE, 250}, {-1, 200},
+  {HIGH_TONE, 250}, {-1, 200},
+  {HIGH_TONE, 250}, {-1, 200},
+  {HIGH_TONE, 250}, {-1, 200},
+  {HIGH_TONE, 250}, {-1, 200},
+  {HIGH_TONE, 250}, {-1, 200},
+  {HIGH_TONE, 250}, {-1, 200},
+  {HIGH_TONE, 250}, {-1, 200},
+  {HIGH_TONE, 250}, {-1, 200},
+  {HIGH_TONE, 250}, {-1, 200},
+  {LOW_TONE, 300}, {-1, 300},
+  {LOW_TONE, 300}, {-1, 300}
 };
 const int alert1MinPatternLen = 24;
 
 BuzzerNote completionPattern[] = {
-  {HIGH_TONE, 300}, {-1, 100},
-  {HIGH_TONE, 300}, {-1, 200},
-  {LOW_TONE, 300}, {-1, 200},
-  {HIGH_TONE, 300}, {-1, 100},
-  {LOW_TONE, 300}, {-1, 100},
-  {HIGH_TONE, 300}, {-1, 200}
+  {HIGH_TONE, 300}, {-1, 250},
+  {HIGH_TONE, 300}, {-1, 300},
+  {LOW_TONE, 300}, {-1, 300},
+  {HIGH_TONE, 300}, {-1, 250},
+  {LOW_TONE, 300}, {-1, 250},
+  {HIGH_TONE, 300}, {-1, 300}
 };
 const int completionPatternLen = 12;
 
