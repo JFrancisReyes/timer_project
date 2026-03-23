@@ -36,6 +36,11 @@ bool blinkState = true;
 unsigned long blinkTimer = 0;
 const int blinkInterval = 600;
 
+// Status message variables (for temporary button feedback)
+int timerStatusMessage = 0;  // 0=none, 1=paused, 2=running, 3=reset
+unsigned long statusMessageTime = 0;
+const unsigned long MESSAGE_DURATION = 10000;  // 10 seconds
+
 // Buzzer sequence variables
 bool buzzerActive = false;
 unsigned long buzzerStartTime = 0;
@@ -147,6 +152,10 @@ void readKeypad() {
         lastSecond = millis();  // Reset timing reference for accurate countdown
       }
       timerRunning = !timerRunning;
+      
+      // Set status message
+      timerStatusMessage = timerRunning ? 2 : 1;  // 2=running, 1=paused
+      statusMessageTime = millis();
     }
   }
 
@@ -161,6 +170,10 @@ void readKeypad() {
       buzzerActive = false;
       noTone(BUZZER);
       for (int i = 0; i < 4; i++) timerDigits[i] = 0;
+      
+      // Set status message
+      timerStatusMessage = 3;  // 3=reset
+      statusMessageTime = millis();
     }
   }
 
@@ -395,12 +408,25 @@ void updateLCD() {
     lcd.print("  ");
   }
   
-  // Display SET MODE on bottom row if in setting mode
+  // Display bottom row: SET MODE or Status Message or blank
   lcd.setCursor(0, 1);
+  
+  // Check if status message has expired
+  if (timerStatusMessage != 0 && (millis() - statusMessageTime > MESSAGE_DURATION)) {
+    timerStatusMessage = 0;  // Clear expired message
+  }
+  
+  // Display based on priority: SET MODE > Status Message > Blank
   if (settingMode) {
-    lcd.print("SET MODE        ");  // 16 chars total to clear any old text
+    lcd.print("SET MODE        ");
+  } else if (timerStatusMessage == 1) {
+    lcd.print("TIMER IS PAUSED ");
+  } else if (timerStatusMessage == 2) {
+    lcd.print("TIMER IS RUNNING");
+  } else if (timerStatusMessage == 3) {
+    lcd.print("TIMER RESET     ");
   } else {
-    lcd.print("                ");  // Clear bottom row when not in setting mode
+    lcd.print("                ");  // Clear bottom row
   }
 }
 
