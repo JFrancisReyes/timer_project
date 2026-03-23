@@ -45,10 +45,17 @@ const unsigned long MESSAGE_DURATION = 10000;  // 10 seconds
 bool buzzerActive = false;
 unsigned long buzzerStartTime = 0;
 int currentBeepIndex = 0;
+int buzzerPatternType = 0;  // 0=none, 1=startup, 2=pause, 3=10min, 4=1min, 5=completion
+
 const int LOW_TONE = 440;
 const int HIGH_TONE = 1200;
+const int LOUD_TONE = 1500;
 const int BEEP_DURATION = 250;  // milliseconds
 const int BEEP_GAP = 150;       // milliseconds between beeps
+
+// Alert tracking
+bool alert10MinTriggered = false;
+bool alert1MinTriggered = false;
 
 const byte ROWS = 4;
 const byte COLS = 4;
@@ -148,8 +155,21 @@ void readKeypad() {
         // This prevents losing the seconds component when resuming from pause
         if (remainingSeconds == 0) {
           remainingSeconds = getTimerSeconds();
+          // Startup beep: 3 loud beeps
+          buzzerPatternType = 1;
+          buzzerActive = true;
+          buzzerStartTime = millis();
+          currentBeepIndex = 0;
+          alert10MinTriggered = false;
+          alert1MinTriggered = false;
         }
         lastSecond = millis();  // Reset timing reference for accurate countdown
+      } else {
+        // Pause beep: Low-High-Low-High sequence
+        buzzerPatternType = 2;
+        buzzerActive = true;
+        buzzerStartTime = millis();
+        currentBeepIndex = 0;
       }
       timerRunning = !timerRunning;
       
@@ -331,9 +351,30 @@ void updateTimer() {
       timerDigits[1] = h % 10;
       timerDigits[2] = m / 10;
       timerDigits[3] = m % 10;
+      
+      // Check for 10-minute threshold (600 seconds)
+      if (remainingSeconds == 600 && !alert10MinTriggered) {
+        alert10MinTriggered = true;
+        buzzerPatternType = 3;  // 10-min alert: 5 high beeps
+        buzzerActive = true;
+        buzzerStartTime = millis();
+        currentBeepIndex = 0;
+      }
+      
+      // Check for 1-minute threshold (60 seconds)
+      if (remainingSeconds == 60 && !alert1MinTriggered) {
+        alert1MinTriggered = true;
+        buzzerPatternType = 4;  // 1-min alert: 10 high + 2 low beeps
+        buzzerActive = true;
+        buzzerStartTime = millis();
+        currentBeepIndex = 0;
+      }
     } else {
       timerRunning = false;
-      startBuzzerSequence();
+      buzzerPatternType = 5;  // Completion: cheerful sequence
+      buzzerActive = true;
+      buzzerStartTime = millis();
+      currentBeepIndex = 0;
     }
   }
 }
@@ -478,41 +519,159 @@ void sendToSubsystem() {
   SubSerial.print(buffer);
 }
 
-void startBuzzerSequence() {
-  buzzerActive = true;
-  buzzerStartTime = millis();
-  currentBeepIndex = 0;
-  playBeep(0);  // Start with the first beep
-}
-
-void playBeep(int beepIndex) {
-  // Sequence: Low, High, Low, High
-  if (beepIndex % 2 == 0) {
-    tone(BUZZER, LOW_TONE, BEEP_DURATION);
-  } else {
-    tone(BUZZER, HIGH_TONE, BEEP_DURATION);
-  }
-}
-
 void updateBuzzerSequence() {
   if (!buzzerActive) return;
 
   unsigned long elapsedTime = millis() - buzzerStartTime;
-  unsigned long cycleTime = BEEP_DURATION + BEEP_GAP;
-  unsigned long totalSequenceTime = cycleTime * 4;  // 4 beeps total
+  
+  switch(buzzerPatternType) {
+    case 1: // Startup: 3 loud beeps
+      updateStartupBeep(elapsedTime);
+      break;
+    case 2: // Pause: Low-High-Low-High x2
+      updatePauseBeep(elapsedTime);
+      break;
+    case 3: // 10-min alert: 5 high beeps
+      update10MinBeep(elapsedTime);
+      break;
+    case 4: // 1-min alert: 10 high + 2 low
+      update1MinBeep(elapsedTime);
+      break;
+    case 5: // Completion: cheerful sequence
+      updateCompletionBeep(elapsedTime);
+      break;
+  }
+}
 
-  if (elapsedTime < totalSequenceTime) {
-    int currentCycle = elapsedTime / cycleTime;
-
-    // Check if we need to start a new beep
-    if (elapsedTime % cycleTime == 0 && (elapsedTime / cycleTime) != currentBeepIndex) {
-      currentBeepIndex = elapsedTime / cycleTime;
-      playBeep(currentBeepIndex);
+void updateStartupBeep(unsigned long elapsedTime) {
+  // 3 loud beeps: LOUD(250ms) gap(300ms) LOUD gap LOUD
+  unsigned long beepDuration = 250;
+  unsigned long gapDuration = 300;
+  unsigned long cycleTime = beepDuration + gapDuration;
+  unsigned long totalTime = cycleTime * 3;
+  
+  if (elapsedTime < totalTime) {
+    int beepNumber = elapsedTime / cycleTime;
+    unsigned long posInCycle = elapsedTime % cycleTime;
+    
+    if (posInCycle < beepDuration) {
+      if (posInCycle == 0) tone(BUZZER, LOUD_TONE, beepDuration);
     }
   } else {
-    // Sequence finished
     buzzerActive = false;
     noTone(BUZZER);
-    currentBeepIndex = 0;
+  }
+}
+
+void updatePauseBeep(unsigned long elapsedTime) {
+  // Low-High-Low-High sequence, 2 times
+  // Pattern: L(250) H(250) L(250) H(250) gap(400) L(250) H(250) L(250) H(250)
+  unsigned long beepDuration = 250;
+  unsigned long gapDuration = 150;
+  unsigned long cycleTime = beepDuration + gapDuration;
+  unsigned long pattern[] = {0, 1, 0, 1}; // 0=low, 1=high
+  unsigned long totalTime = cycleTime * 8 + 250;  // 8 beeps + extra gap
+  
+  if (elapsedTime < totalTime) {
+    int beepIndex = elapsedTime / cycleTime;
+    unsigned long posInCycle = elapsedTime % cycleTime;
+    
+    if (beepIndex < 8) {
+      if (posInCycle < beepDuration) {
+        if (posInCycle == 0) {
+          int tone_freq = (pattern[beepIndex % 4] == 0) ? LOW_TONE : HIGH_TONE;
+          tone(BUZZER, tone_freq, beepDuration);
+        }
+      }
+    }
+  } else {
+    buzzerActive = false;
+    noTone(BUZZER);
+  }
+}
+
+void update10MinBeep(unsigned long elapsedTime) {
+  // 5 high beeps with proper spacing
+  unsigned long beepDuration = 300;
+  unsigned long gapDuration = 200;
+  unsigned long cycleTime = beepDuration + gapDuration;
+  unsigned long totalTime = cycleTime * 5;
+  
+  if (elapsedTime < totalTime) {
+    int beepNumber = elapsedTime / cycleTime;
+    unsigned long posInCycle = elapsedTime % cycleTime;
+    
+    if (posInCycle < beepDuration) {
+      if (posInCycle == 0) tone(BUZZER, HIGH_TONE, beepDuration);
+    }
+  } else {
+    buzzerActive = false;
+    noTone(BUZZER);
+  }
+}
+
+void update1MinBeep(unsigned long elapsedTime) {
+  // 10 high beeps + 2 low beeps
+  unsigned long beepDuration = 200;
+  unsigned long gapDuration = 100;
+  unsigned long cycleTime = beepDuration + gapDuration;
+  unsigned long totalTime = cycleTime * 12;  // 10 high + 2 low
+  
+  if (elapsedTime < totalTime) {
+    int beepIndex = elapsedTime / cycleTime;
+    unsigned long posInCycle = elapsedTime % cycleTime;
+    
+    if (posInCycle < beepDuration) {
+      if (posInCycle == 0) {
+        int tone_freq = (beepIndex < 10) ? HIGH_TONE : LOW_TONE;
+        tone(BUZZER, tone_freq, beepDuration);
+      }
+    }
+  } else {
+    buzzerActive = false;
+    noTone(BUZZER);
+  }
+}
+
+void updateCompletionBeep(unsigned long elapsedTime) {
+  // Cheerful completion: High-High gap Low gap High-Low-High pattern
+  // H(300) H(300) gap(200) L(300) gap(200) H(300) L(300) H(300)
+  unsigned long part1 = 600; // 2 high beeps
+  unsigned long gap1 = 200;
+  unsigned long part2 = 300; // 1 low beep
+  unsigned long gap2 = 200;
+  unsigned long part3 = 900; // H-L-H pattern
+  unsigned long totalTime = part1 + gap1 + part2 + gap2 + part3 + 200;
+  
+  if (elapsedTime < totalTime) {
+    // First section: 2 high beeps
+    if (elapsedTime < part1) {
+      int beepNum = elapsedTime / 300;
+      if ((elapsedTime % 300) == 0) tone(BUZZER, HIGH_TONE, 300);
+    }
+    // Gap
+    else if (elapsedTime < part1 + gap1) {
+      // Silent
+    }
+    // Second section: 1 low beep
+    else if (elapsedTime < part1 + gap1 + part2) {
+      if (((elapsedTime - part1 - gap1) % 300) == 0) tone(BUZZER, LOW_TONE, 300);
+    }
+    // Gap
+    else if (elapsedTime < part1 + gap1 + part2 + gap2) {
+      // Silent
+    }
+    // Third section: H-L-H pattern
+    else if (elapsedTime < totalTime) {
+      unsigned long pos = elapsedTime - part1 - gap1 - part2 - gap2;
+      int section = pos / 300;
+      if ((pos % 300) == 0) {
+        int tone_freq = (section % 2 == 0) ? HIGH_TONE : LOW_TONE;
+        tone(BUZZER, tone_freq, 300);
+      }
+    }
+  } else {
+    buzzerActive = false;
+    noTone(BUZZER);
   }
 }
