@@ -183,7 +183,14 @@ void readKeypad() {
     settingMode = !settingMode;
 
     if (settingMode) {
-      // Swap cursor position based on mode
+      // Pause timer when entering set mode (only in timer mode)
+      if (!displayClock && timerRunning) {
+        timerRunning = false;
+        timerStatusMessage = 1;  // Show "TIMER IS PAUSED"
+        statusMessageTime = millis();
+      }
+      
+      // Update cursor position based on mode
       if (displayClock) {
         clockCursorPos = 0;
         cursorPos = clockCursorPos;
