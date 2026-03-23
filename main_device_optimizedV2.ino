@@ -46,9 +46,9 @@ bool buzzerActive = false;
 unsigned long buzzerStartTime = 0;
 int buzzerPatternType = 0;  // 0=none, 1=startup, 2=pause, 3=10min, 4=1min, 5=completion
 
-const int LOW_TONE = 440;
-const int HIGH_TONE = 1400;
-const int LOUD_TONE = 2200;
+const int LOW_TONE = 600;
+const int HIGH_TONE = 2500;
+const int LOUD_TONE = 3500;
 
 // Buzzer pattern: array of (frequency, duration in ms) pairs, -1 frequency = silence
 struct BuzzerNote {
