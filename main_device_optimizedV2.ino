@@ -37,7 +37,7 @@ unsigned long blinkTimer = 0;
 const int blinkInterval = 600;
 
 // Status message variables (for temporary button feedback)
-int timerStatusMessage = 0;  // 0=none, 1=paused, 2=running, 3=reset
+int timerStatusMessage = 0;  // 0=none, 1=paused, 2=running, 3=reset, 4=clock mode, 5=timer mode
 unsigned long statusMessageTime = 0;
 const unsigned long MESSAGE_DURATION = 10000;  // 10 seconds
 
@@ -206,9 +206,14 @@ void readKeypad() {
       if (displayClock) {
         cursorPos = clockCursorPos;
         loadClockDigits();
+        // Set status message
+        timerStatusMessage = 4;  // 4=clock mode
       } else {
         cursorPos = timerCursorPos;
+        // Set status message
+        timerStatusMessage = 5;  // 5=timer mode
       }
+      statusMessageTime = millis();
     }
   }
 }
@@ -425,6 +430,10 @@ void updateLCD() {
     lcd.print("TIMER IS RUNNING");
   } else if (timerStatusMessage == 3) {
     lcd.print("TIMER RESET     ");
+  } else if (timerStatusMessage == 4) {
+    lcd.print("CLOCK MODE      ");
+  } else if (timerStatusMessage == 5) {
+    lcd.print("TIMER MODE      ");
   } else {
     lcd.print("                ");  // Clear bottom row
   }
