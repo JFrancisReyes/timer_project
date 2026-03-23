@@ -122,7 +122,8 @@ void readKeypad() {
         moveCursorRight();
       }
     } else {
-      if (validTimerDigit(cursorPos, value)) {
+      // Timer mode - only accept input for positions 0-3
+      if (cursorPos >= 0 && cursorPos <= 3 && validTimerDigit(cursorPos, value)) {
         timerDigits[cursorPos] = value;
         moveCursorRight();
       }
@@ -168,6 +169,9 @@ void readKeypad() {
   // Switch between clock and timer display
   if (key == 'D') {
     displayClock = !displayClock;
+    // Reset cursor position and setting mode when switching modes
+    cursorPos = 0;
+    if (settingMode && displayClock) loadClockDigits();
   }
 }
 
@@ -220,7 +224,9 @@ bool validClockDigit(int pos, int value) {
 
 void moveCursorRight() {
   cursorPos++;
-  if (cursorPos > 4) cursorPos = 4;  // Max position now 4 (for AM/PM)
+  // Limit based on current mode: timer mode max 3, clock mode max 4
+  int maxPos = displayClock ? 4 : 3;
+  if (cursorPos > maxPos) cursorPos = maxPos;
 }
 
 void moveCursorLeft() {
