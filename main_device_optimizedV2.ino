@@ -296,8 +296,8 @@ void updateLCD() {
     bool isPM;
     convert24to12(h, h12, isPM);
     
-    // Use editable clockPM if in setting mode, otherwise use actual isPM
-    if (settingMode) isPM = clockPM;
+    // Always use the saved clockPM value (user's choice)
+    isPM = clockPM;
 
     printDigit(0, h12 / 10);
     printDigit(1, h12 % 10);
