@@ -119,9 +119,9 @@ unsigned long patternNoteStart = 0;
 bool alert10MinTriggered = false;
 bool alert1MinTriggered = false;
 
-// Auto-sync grace period for AM/PM
+// Auto-sync AM/PM on hour transitions only
 unsigned long lastClockEditTime = 0;
-const unsigned long CLOCK_EDIT_GRACE_PERIOD = 5000;  // 5 seconds before auto-sync kicks in
+int lastTrackedHour = -1;  // Track last hour to detect transitions
 
 const byte ROWS = 4;
 const byte COLS = 4;
@@ -162,7 +162,10 @@ void setup() {
   SubSerial.begin(115200, SERIAL_8N1, RX_SUB, TX_SUB);
   pinMode(BUZZER, OUTPUT);
   loadClockDigits();
-}
+  
+  // Initialize hour tracking for AM/PM auto-sync on transitions
+  DateTime now = rtc.now();
+  lastTrackedHour = now.hour();
 
 void loop() {
   readKeypad();
@@ -480,12 +483,17 @@ void updateLCD() {
     bool isPM;
     convert24to12(h, h12, isPM);
     
-    // Auto-sync AM/PM with actual RTC time only after grace period (not immediately after editing)
-    if (!settingMode && (millis() - lastClockEditTime > CLOCK_EDIT_GRACE_PERIOD)) {
-      clockPM = (now.hour() >= 12);
+    // Auto-sync AM/PM only when hour changes (on natural time transitions at 12:00 or 00:00)
+    if (!settingMode) {
+      int currentHour = now.hour();
+      if (lastTrackedHour != currentHour) {
+        // Hour changed - sync AM/PM with RTC
+        clockPM = (currentHour >= 12);
+        lastTrackedHour = currentHour;
+      }
     }
     
-    // Use the current clockPM value (auto-synced or manually set during editing)
+    // Use the manually-set or auto-synced clockPM value
     isPM = clockPM;
 
     printDigit(0, h12 / 10);
