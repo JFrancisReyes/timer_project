@@ -134,24 +134,34 @@ void readKeypad() {
   if (key == '*' && settingMode) moveCursorLeft();
   if (key == '#' && settingMode) moveCursorRight();
   if (key == 'A' && !displayClock) {
-    if (!timerRunning) {
-      // FIX: Only calculate from digits if starting fresh (remainingSeconds is 0)
-      // This prevents losing the seconds component when resuming from pause
-      if (remainingSeconds == 0) {
-        remainingSeconds = getTimerSeconds();
+    // Auto-exit setting mode when button A is pressed
+    if (settingMode) {
+      settingMode = false;
+    } else {
+      if (!timerRunning) {
+        // FIX: Only calculate from digits if starting fresh (remainingSeconds is 0)
+        // This prevents losing the seconds component when resuming from pause
+        if (remainingSeconds == 0) {
+          remainingSeconds = getTimerSeconds();
+        }
+        lastSecond = millis();  // Reset timing reference for accurate countdown
       }
-      lastSecond = millis();  // Reset timing reference for accurate countdown
+      timerRunning = !timerRunning;
     }
-    timerRunning = !timerRunning;
   }
 
   // Reset timer
   if (key == 'B') {
-    timerRunning = false;
-    remainingSeconds = 0;
-    buzzerActive = false;
-    noTone(BUZZER);
-    for (int i = 0; i < 4; i++) timerDigits[i] = 0;
+    // Auto-exit setting mode when button B is pressed
+    if (settingMode) {
+      settingMode = false;
+    } else {
+      timerRunning = false;
+      remainingSeconds = 0;
+      buzzerActive = false;
+      noTone(BUZZER);
+      for (int i = 0; i < 4; i++) timerDigits[i] = 0;
+    }
   }
 
   // Toggle editing mode
@@ -174,13 +184,18 @@ void readKeypad() {
 
   // Switch between clock and timer display
   if (key == 'D') {
-    displayClock = !displayClock;
-    // Swap cursor position based on new mode
-    if (displayClock) {
-      cursorPos = clockCursorPos;
-      if (settingMode) loadClockDigits();
+    // Auto-exit setting mode when button D is pressed
+    if (settingMode) {
+      settingMode = false;
     } else {
-      cursorPos = timerCursorPos;
+      displayClock = !displayClock;
+      // Swap cursor position based on new mode
+      if (displayClock) {
+        cursorPos = clockCursorPos;
+        loadClockDigits();
+      } else {
+        cursorPos = timerCursorPos;
+      }
     }
   }
 }
@@ -378,6 +393,14 @@ void updateLCD() {
     // Clear AM/PM positions (12-13) when in timer mode
     lcd.setCursor(12, 0);
     lcd.print("  ");
+  }
+  
+  // Display SET MODE on bottom row if in setting mode
+  lcd.setCursor(0, 1);
+  if (settingMode) {
+    lcd.print("SET MODE        ");  // 16 chars total to clear any old text
+  } else {
+    lcd.print("                ");  // Clear bottom row when not in setting mode
   }
 }
 
