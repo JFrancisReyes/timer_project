@@ -166,6 +166,7 @@ void setup() {
   // Initialize hour tracking for AM/PM auto-sync on transitions
   DateTime now = rtc.now();
   lastTrackedHour = now.hour();
+}
 
 void loop() {
   readKeypad();
