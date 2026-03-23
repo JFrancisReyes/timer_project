@@ -161,6 +161,10 @@ void setup() {
   
   SubSerial.begin(115200, SERIAL_8N1, RX_SUB, TX_SUB);
   pinMode(BUZZER, OUTPUT);
+  
+  // HARD RESET: Clear all volatile state variables to prevent corruption after power loss
+  resetAllStates();
+  
   loadClockDigits();
   
   // Initialize hour tracking for AM/PM auto-sync on transitions
@@ -175,6 +179,55 @@ void loop() {
   updateBuzzerSequence();
   updateLCD();
   sendToSubsystem();
+}
+
+// HARD RESET: Initialize all volatile state variables to safe defaults
+// This prevents corruption bugs after sudden power loss
+void resetAllStates() {
+  // Timer state
+  for (int i = 0; i < 4; i++) {
+    timerDigits[i] = 0;
+  }
+  remainingSeconds = 0;
+  timerRunning = false;
+  timerCursorPos = 0;
+  
+  // Clock state
+  for (int i = 0; i < 4; i++) {
+    clockDigits[i] = 0;
+  }
+  clockCursorPos = 0;
+  
+  // Display/UI state
+  displayClock = false;
+  settingMode = false;
+  cursorPos = 0;
+  blinkState = true;
+  blinkTimer = millis();
+  
+  // Status messages
+  timerStatusMessage = 0;
+  statusMessageTime = 0;
+  
+  // Buzzer state
+  buzzerActive = false;
+  buzzerStartTime = 0;
+  buzzerPatternType = 0;
+  currentPatternIndex = 0;
+  patternNoteStart = 0;
+  noTone(BUZZER);  // Ensure buzzer is off
+  
+  // Alert tracking
+  alert10MinTriggered = false;
+  alert1MinTriggered = false;
+  
+  // Timing references
+  lastSecond = millis();
+  
+  // AM/PM (load from EEPROM - not reset)
+  // clockPM is preserved from EEPROM
+  
+  Serial.println("All states reset to safe defaults!");
 }
 
 void updateBlink() {
