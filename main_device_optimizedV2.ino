@@ -715,7 +715,7 @@ void sendToSubsystem() {
     d3 = timerDigits[3];
   }
 
-  sprintf(buffer, ">%d%d%d%d%d%d\n", d0, d1, d2, d3, settingMode, cursorPos);
+  sprintf(buffer, "%d%d%d%d%d%d\n", d0, d1, d2, d3, settingMode, cursorPos);
   SubSerial.print(buffer);
 }
 

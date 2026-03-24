@@ -33,6 +33,10 @@ const int blinkInterval = 600;
 char buffer[12];
 int bufferIndex = 0;
 
+// Startup delay to ignore garbage data during power stabilization
+unsigned long bootStartTime = 0;
+const unsigned long BOOT_SETTLE_TIME = 1000;  // Wait 1 second after boot before processing serial data
+
 // Array of pin configurations for cleaner code
 struct DisplayPins {
   int A, B, C, D;
@@ -89,6 +93,9 @@ void resetAllStates() {
   }
   bufferIndex = 0;
   
+  // Boot delay timer
+  bootStartTime = millis();
+  
   // Flush any pending serial data
   while (Serial2.available()) {
     Serial2.read();  // Clear the buffer
@@ -113,33 +120,33 @@ void updateBlink() {
 }
 
 void readSerial() {
+  // Ignore all serial data during boot settle period to avoid garbage
+  if (millis() - bootStartTime < BOOT_SETTLE_TIME) {
+    // Flush any pending data without processing it
+    while (Serial2.available()) {
+      Serial2.read();
+    }
+    return;
+  }
+
   while (Serial2.available()) {
     char c = Serial2.read();
 
-    // Frame synchronization: only process data after seeing frame start marker '>'
-    if (bufferIndex == 0 && c != '>') {
-      return;  // Discard garbage until frame marker is found
-    }
-
     if (c == '\n') {
-      // Validate frame length (should be 7 chars: >DDDDSS + newline)
-      if (bufferIndex == 7) {
-        // Parse incoming data (skip the '>' marker at position 0)
-        digits[0] = buffer[1] - '0';
-        digits[1] = buffer[2] - '0';
-        digits[2] = buffer[3] - '0';
-        digits[3] = buffer[4] - '0';
+      buffer[bufferIndex] = 0;
 
-        settingMode = buffer[5] - '0';
-        cursorPos = buffer[6] - '0';
-      }
-      // Reset buffer regardless of validity
+      // Parse incoming data
+      digits[0] = buffer[0] - '0';
+      digits[1] = buffer[1] - '0';
+      digits[2] = buffer[2] - '0';
+      digits[3] = buffer[3] - '0';
+
+      settingMode = buffer[4] - '0';
+      cursorPos = buffer[5] - '0';
+
       bufferIndex = 0;
-    } else if (bufferIndex < 7) {
-      buffer[bufferIndex++] = c;
     } else {
-      // Buffer overflow protection: reset if we receive too much data
-      bufferIndex = 0;
+      buffer[bufferIndex++] = c;
     }
   }
 }
