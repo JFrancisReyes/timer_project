@@ -35,7 +35,7 @@ int bufferIndex = 0;
 
 // Startup delay to ignore garbage data during power stabilization
 unsigned long bootStartTime = 0;
-const unsigned long BOOT_SETTLE_TIME = 1000;  // Wait 1 second after boot before processing serial data
+const unsigned long BOOT_SETTLE_TIME = 3000;  // Wait 3 seconds after boot before processing serial data
 
 // Array of pin configurations for cleaner code
 struct DisplayPins {
