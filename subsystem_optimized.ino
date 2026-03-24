@@ -116,21 +116,30 @@ void readSerial() {
   while (Serial2.available()) {
     char c = Serial2.read();
 
+    // Frame synchronization: only process data after seeing frame start marker '>'
+    if (bufferIndex == 0 && c != '>') {
+      return;  // Discard garbage until frame marker is found
+    }
+
     if (c == '\n') {
-      buffer[bufferIndex] = 0;
+      // Validate frame length (should be 7 chars: >DDDDSS + newline)
+      if (bufferIndex == 7) {
+        // Parse incoming data (skip the '>' marker at position 0)
+        digits[0] = buffer[1] - '0';
+        digits[1] = buffer[2] - '0';
+        digits[2] = buffer[3] - '0';
+        digits[3] = buffer[4] - '0';
 
-      // Parse incoming data
-      digits[0] = buffer[0] - '0';
-      digits[1] = buffer[1] - '0';
-      digits[2] = buffer[2] - '0';
-      digits[3] = buffer[3] - '0';
-
-      settingMode = buffer[4] - '0';
-      cursorPos = buffer[5] - '0';
-
+        settingMode = buffer[5] - '0';
+        cursorPos = buffer[6] - '0';
+      }
+      // Reset buffer regardless of validity
       bufferIndex = 0;
-    } else {
+    } else if (bufferIndex < 7) {
       buffer[bufferIndex++] = c;
+    } else {
+      // Buffer overflow protection: reset if we receive too much data
+      bufferIndex = 0;
     }
   }
 }
