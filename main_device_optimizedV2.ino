@@ -30,10 +30,6 @@ bool timerRunning = false;
 long remainingSeconds = 0;
 unsigned long lastSecond = 0;
 
-// Boot startup timing
-unsigned long bootStartTime = 0;
-const unsigned long BOOT_SETTLE_TIME = 3000;  // Don't send serial data for 3 seconds after boot
-
 bool blinkState = true;
 unsigned long blinkTimer = 0;
 const int blinkInterval = 600;
@@ -159,9 +155,6 @@ void setup() {
   
   SubSerial.begin(115200, SERIAL_8N1, RX_SUB, TX_SUB);
   pinMode(BUZZER, OUTPUT);
-  
-  // Initialize boot timing
-  bootStartTime = millis();
   
   loadClockDigits();
   
@@ -542,11 +535,6 @@ void updateLCD() {
 }
 
 void sendToSubsystem() {
-  // Don't send anything during boot settle period
-  if (millis() - bootStartTime < BOOT_SETTLE_TIME) {
-    return;
-  }
-
   char buffer[10];
   int d0, d1, d2, d3;
 

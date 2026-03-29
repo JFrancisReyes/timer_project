@@ -33,10 +33,6 @@ const int blinkInterval = 600;
 char buffer[12];
 int bufferIndex = 0;
 
-// Startup delay to ignore garbage data during power stabilization
-unsigned long bootStartTime = 0;
-const unsigned long BOOT_SETTLE_TIME = 3000;  // Wait 3 seconds after boot before processing serial data
-
 // Array of pin configurations for cleaner code
 struct DisplayPins {
   int A, B, C, D;
@@ -76,15 +72,6 @@ void updateBlink() {
 }
 
 void readSerial() {
-  // Ignore all serial data during boot settle period to avoid garbage
-  if (millis() - bootStartTime < BOOT_SETTLE_TIME) {
-    // Flush any pending data without processing it
-    while (Serial2.available()) {
-      Serial2.read();
-    }
-    return;
-  }
-
   while (Serial2.available()) {
     char c = Serial2.read();
 
