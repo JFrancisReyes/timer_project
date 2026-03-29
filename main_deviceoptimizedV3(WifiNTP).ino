@@ -16,8 +16,18 @@ const char* ntpServer = "pool.ntp.org";
 const long gmtOffset_sec = 0;             // UTC offset in seconds (0 for UTC)
 const int daylightOffset_sec = 0;         // Daylight saving offset in seconds
 
+// Timezone Examples:
+// UTC: 0
+// EST: -18000 (UTC-5)
+// CST: -21600 (UTC-6)
+// PST: -28800 (UTC-8)
+// CET: 3600 (UTC+1)
+// IST: 19800 (UTC+5:30)
+// PHT (Philippine Time): 28800 (UTC+8) <-- Philippine Standard Time
+
+
 // WiFi Connection Timeout
-const int WIFI_TIMEOUT_MS = 20000;        // 20 seconds timeout for WiFi connection
+const int WIFI_TIMEOUT_MS = 30000;        // 30 seconds timeout for WiFi connection
 unsigned long wifiStartTime = 0;
 bool wifiConnected = false;
 
