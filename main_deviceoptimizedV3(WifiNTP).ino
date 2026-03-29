@@ -3,7 +3,25 @@
 #include <Keypad.h>
 #include <RTClib.h>
 #include <EEPROM.h>
+#include <WiFi.h>       // WiFi capability
+#include <time.h>       // Time functions for NTP
 
+// ==================== WiFi Configuration ====================
+// IMPORTANT: Replace with YOUR credentials
+const char* ssid = "YOUR_SSID";           // Your WiFi network name
+const char* password = "YOUR_PASSWORD";   // Your WiFi password
+
+// NTP Server Configuration
+const char* ntpServer = "pool.ntp.org";
+const long gmtOffset_sec = 0;             // UTC offset in seconds (0 for UTC)
+const int daylightOffset_sec = 0;         // Daylight saving offset in seconds
+
+// WiFi Connection Timeout
+const int WIFI_TIMEOUT_MS = 20000;        // 20 seconds timeout for WiFi connection
+unsigned long wifiStartTime = 0;
+bool wifiConnected = false;
+
+// ==================== Hardware Definitions ====================
 // Create a second I2C bus for RTC
 TwoWire I2C_RTC = TwoWire(1);
 
@@ -16,6 +34,7 @@ HardwareSerial SubSerial(2);
 #define RX_SUB 16
 #define BUZZER 4
 
+// ==================== State Variables ====================
 int timerDigits[4] = {0, 0, 0, 0};
 int clockDigits[4] = {0, 0, 0, 0};
 
@@ -117,6 +136,7 @@ unsigned long patternNoteStart = 0;
 bool alert10MinTriggered = false;
 bool alert1MinTriggered = false;
 
+// ==================== Keypad Configuration ====================
 const byte ROWS = 4;
 const byte COLS = 4;
 
@@ -132,8 +152,12 @@ byte colPins[COLS] = {26, 25, 33, 32};
 
 Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);
 
+// ==================== Setup ====================
 void setup() {
   Serial.begin(115200);
+  delay(1000);  // Wait for serial to stabilize
+  
+  Serial.println("\n\n========== TIMER SYSTEM V3 (WiFi+NTP) STARTING ==========");
   
   // Initialize I2C Bus 0 for LCD on GPIO 21,22
   Wire.begin(21, 22);
@@ -143,12 +167,15 @@ void setup() {
   
   lcd.init();
   lcd.backlight();
+  lcd.print("Initializing...");
   
   // Initialize RTC with second I2C bus
   rtc.begin(&I2C_RTC);
   
   if (!rtc.begin(&I2C_RTC)) {
-    Serial.println("RTC DS3231 not found!");
+    Serial.println("ERROR: RTC DS3231 not found!");
+    lcd.clear();
+    lcd.print("RTC ERROR");
   } else {
     Serial.println("RTC DS3231 initialized successfully!");
   }
@@ -156,11 +183,100 @@ void setup() {
   SubSerial.begin(115200, SERIAL_8N1, RX_SUB, TX_SUB);
   pinMode(BUZZER, OUTPUT);
   
+  // ==================== WiFi + NTP Initialization ====================
+  Serial.println("\n--- WiFi & NTP Initialization ---");
+  lcd.clear();
+  lcd.print("WiFi: Connecting");
+  Serial.print("Connecting to WiFi: ");
+  Serial.println(ssid);
+  
+  WiFi.begin(ssid, password);
+  wifiStartTime = millis();
+  
+  // Wait for WiFi connection with timeout
+  int wifiAttempts = 0;
+  while (WiFi.status() != WL_CONNECTED && (millis() - wifiStartTime) < WIFI_TIMEOUT_MS) {
+    delay(500);
+    Serial.print(".");
+    wifiAttempts++;
+    if (wifiAttempts % 4 == 0) {
+      lcd.clear();
+      lcd.print("Connecting.");
+      lcd.print(wifiAttempts / 2);
+    }
+  }
+  
+  // Check if connected
+  if (WiFi.status() == WL_CONNECTED) {
+    wifiConnected = true;
+    Serial.println("\nWiFi connected!");
+    Serial.print("IP Address: ");
+    Serial.println(WiFi.localIP());
+    
+    // Configure time with NTP
+    Serial.println("Syncing time from NTP server...");
+    lcd.clear();
+    lcd.print("NTP: Syncing");
+    configTime(gmtOffset_sec, daylightOffset_sec, ntpServer, "time.nist.gov");
+    
+    // Wait for time to be set (NTP sync)
+    time_t now = time(nullptr);
+    int ntpAttempts = 0;
+    while (now < 24 * 3600 && ntpAttempts < 20) {
+      delay(500);
+      Serial.print("*");
+      now = time(nullptr);
+      ntpAttempts++;
+    }
+    Serial.println();
+    
+    if (now > 24 * 3600) {
+      Serial.println("Time synchronized successfully!");
+      Serial.print("Current time: ");
+      Serial.println(ctime(&now));
+      
+      // Update DS3231 RTC with NTP time
+      struct tm timeinfo;
+      localtime_r(&now, &timeinfo);
+      rtc.adjust(DateTime(
+        timeinfo.tm_year + 1900,
+        timeinfo.tm_mon + 1,
+        timeinfo.tm_mday,
+        timeinfo.tm_hour,
+        timeinfo.tm_min,
+        timeinfo.tm_sec
+      ));
+      
+      Serial.println("DS3231 RTC updated with NTP time!");
+      lcd.clear();
+      lcd.print("NTP: SUCCESS");
+      delay(2000);
+    } else {
+      Serial.println("ERROR: NTP sync timeout!");
+      lcd.clear();
+      lcd.print("NTP: TIMEOUT");
+      delay(2000);
+    }
+  } else {
+    wifiConnected = false;
+    Serial.println("\nWiFi connection failed!");
+    Serial.println("Using DS3231 time as fallback...");
+    lcd.clear();
+    lcd.print("WiFi: FAILED");
+    delay(2000);
+  }
+  
+  // Disconnect WiFi when done to save power
+  WiFi.disconnect(true);  // true = turn off WiFi radio
+  Serial.println("WiFi disconnected (radio off for power saving)");
+  
   loadClockDigits();
   
-
+  Serial.println("========== SETUP COMPLETE ==========\n");
+  lcd.clear();
 }
 
+// ==================== Main Loop ====================
 void loop() {
   // SAFETY CHECK: Ensure cursor positions never go out of bounds
   if (displayClock) {
@@ -185,6 +301,8 @@ void loop() {
   sendToSubsystem();
 }
 
+// ==================== Core Functions (Same as V2) ====================
+
 void updateBlink() {
   if (millis() - blinkTimer > blinkInterval) {
     blinkTimer = millis();
@@ -196,7 +314,7 @@ void readKeypad() {
   char key = keypad.getKey();
   if (!key) return;
 
-  // Numeric input: 0-9 OR AM/PM selection (1=AM, 2=PM)
+  // Numeric input: 0-9
   if (key >= '0' && key <= '9' && settingMode) {
     int value = key - '0';
 
@@ -206,8 +324,7 @@ void readKeypad() {
         moveCursorRight();
       }
     } else {
-      // Timer mode - strictly positions 0-3 only
-      if (timerCursorPos >= 0 && timerCursorPos <= 3 && validTimerDigit(timerCursorPos, value)) {
+      if (validTimerDigit(timerCursorPos, value)) {
         timerDigits[timerCursorPos] = value;
         moveCursorRight();
       }
@@ -216,45 +333,35 @@ void readKeypad() {
 
   if (key == '*' && settingMode) moveCursorLeft();
   if (key == '#' && settingMode) moveCursorRight();
+
+  // Timer control: Start/Pause
   if (key == 'A' && !displayClock) {
-    // Auto-exit setting mode when button A is pressed
-    if (settingMode) {
-      settingMode = false;
-    } else {
-      if (!timerRunning) {
-        // FIX: Only calculate from digits if starting fresh (remainingSeconds is 0)
-        // This prevents losing the seconds component when resuming from pause
-        if (remainingSeconds == 0) {
-          remainingSeconds = getTimerSeconds();
-          // Startup beep: 3 loud beeps
-          buzzerPatternType = 1;
-          buzzerActive = true;
-          buzzerStartTime = millis();
-          patternNoteStart = millis();
-          currentPatternIndex = 0;
-          alert10MinTriggered = false;
-          alert1MinTriggered = false;
-        }
-        lastSecond = millis();  // Reset timing reference for accurate countdown
-      } else {
-        // Pause beep: Low-High-Low-High sequence
-        buzzerPatternType = 2;
+    if (!timerRunning) {
+      if (remainingSeconds == 0) {
+        remainingSeconds = getTimerSeconds();
+        buzzerPatternType = 1;
         buzzerActive = true;
         buzzerStartTime = millis();
         patternNoteStart = millis();
         currentPatternIndex = 0;
+        alert10MinTriggered = false;
+        alert1MinTriggered = false;
       }
-      timerRunning = !timerRunning;
-      
-      // Set status message
-      timerStatusMessage = timerRunning ? 2 : 1;  // 2=running, 1=paused
-      statusMessageTime = millis();
+      lastSecond = millis();
+    } else {
+      buzzerPatternType = 2;
+      buzzerActive = true;
+      buzzerStartTime = millis();
+      patternNoteStart = millis();
+      currentPatternIndex = 0;
     }
+    timerRunning = !timerRunning;
+    timerStatusMessage = timerRunning ? 2 : 1;
+    statusMessageTime = millis();
   }
 
   // Reset timer
   if (key == 'B') {
-    // Auto-exit setting mode when button B is pressed
     if (settingMode) {
       settingMode = false;
     } else {
@@ -263,9 +370,7 @@ void readKeypad() {
       buzzerActive = false;
       noTone(BUZZER);
       for (int i = 0; i < 4; i++) timerDigits[i] = 0;
-      
-      // Set status message
-      timerStatusMessage = 3;  // 3=reset
+      timerStatusMessage = 3;
       statusMessageTime = millis();
     }
   }
@@ -276,15 +381,11 @@ void readKeypad() {
     settingMode = !settingMode;
 
     if (settingMode) {
-      lastClockEditTime = millis();  // Start grace period when entering edit mode
-      // Pause timer when entering set mode (only in timer mode)
       if (!displayClock && timerRunning) {
         timerRunning = false;
-        timerStatusMessage = 1;  // Show "TIMER IS PAUSED"
+        timerStatusMessage = 1;
         statusMessageTime = millis();
       }
-      
-      // Update cursor position based on mode
       if (displayClock) {
         clockCursorPos = 0;
         cursorPos = clockCursorPos;
@@ -298,21 +399,17 @@ void readKeypad() {
 
   // Switch between clock and timer display
   if (key == 'D') {
-    // Auto-exit setting mode when button D is pressed
     if (settingMode) {
       settingMode = false;
     } else {
       displayClock = !displayClock;
-      // Swap cursor position based on new mode
       if (displayClock) {
         cursorPos = clockCursorPos;
         loadClockDigits();
-        // Set status message
-        timerStatusMessage = 4;  // 4=clock mode
+        timerStatusMessage = 4;
       } else {
         cursorPos = timerCursorPos;
-        // Set status message
-        timerStatusMessage = 5;  // 5=timer mode
+        timerStatusMessage = 5;
       }
       statusMessageTime = millis();
     }
@@ -381,18 +478,17 @@ void moveCursorLeft() {
 long getTimerSeconds() {
   int h = timerDigits[0] * 10 + timerDigits[1];
   int m = timerDigits[2] * 10 + timerDigits[3];
-  return h * 3600L + m * 60L;  // Using long literals for safety
+  return h * 3600L + m * 60L;
 }
 
-// Convert 24-hour format to 12-hour format
 void convert24to12(int hour24, int &hour12, bool &isPM) {
   isPM = (hour24 >= 12);
   if (hour24 == 0) {
-    hour12 = 12;  // Midnight is 12:00 AM
+    hour12 = 12;
   } else if (hour24 <= 12) {
     hour12 = hour24;
   } else {
-    hour12 = hour24 - 12;  // 13:00 becomes 01:00 PM
+    hour12 = hour24 - 12;
   }
 }
 
@@ -405,7 +501,6 @@ void updateTimer() {
     if (remainingSeconds > 0) {
       remainingSeconds--;
 
-      // Update display digits based on remaining time
       int h = remainingSeconds / 3600;
       int m = (remainingSeconds % 3600) / 60;
 
@@ -413,21 +508,19 @@ void updateTimer() {
       timerDigits[1] = h % 10;
       timerDigits[2] = m / 10;
       timerDigits[3] = m % 10;
-      
-      // Check for 10-minute threshold (600 seconds)
+
       if (remainingSeconds == 600 && !alert10MinTriggered) {
         alert10MinTriggered = true;
-        buzzerPatternType = 3;  // 10-min alert: 5 high beeps
+        buzzerPatternType = 3;
         buzzerActive = true;
         buzzerStartTime = millis();
         patternNoteStart = millis();
         currentPatternIndex = 0;
       }
-      
-      // Check for 1-minute threshold (60 seconds)
+
       if (remainingSeconds == 60 && !alert1MinTriggered) {
         alert1MinTriggered = true;
-        buzzerPatternType = 4;  // 1-min alert: 10 high + 2 low beeps
+        buzzerPatternType = 4;
         buzzerActive = true;
         buzzerStartTime = millis();
         patternNoteStart = millis();
@@ -435,7 +528,7 @@ void updateTimer() {
       }
     } else {
       timerRunning = false;
-      buzzerPatternType = 5;  // Completion: cheerful sequence
+      buzzerPatternType = 5;
       buzzerActive = true;
       buzzerStartTime = millis();
       patternNoteStart = millis();
@@ -465,7 +558,6 @@ void updateLCD() {
     int h = settingMode ? clockDigits[0] * 10 + clockDigits[1] : now.hour();
     int m = settingMode ? clockDigits[2] * 10 + clockDigits[3] : now.minute();
 
-    // Convert to 12-hour format
     int h12;
     bool isPM;
     convert24to12(h, h12, isPM);
@@ -507,16 +599,14 @@ void updateLCD() {
     if (timerRunning) lcd.print("G");
     else lcd.print("P");
   }
-  
+
   // Display bottom row: SET MODE or Status Message or blank
   lcd.setCursor(0, 1);
-  
-  // Check if status message has expired
+
   if (timerStatusMessage != 0 && (millis() - statusMessageTime > MESSAGE_DURATION)) {
-    timerStatusMessage = 0;  // Clear expired message
+    timerStatusMessage = 0;
   }
-  
-  // Display based on priority: SET MODE > Status Message > Blank
+
   if (settingMode) {
     lcd.print("SET MODE        ");
   } else if (timerStatusMessage == 1) {
@@ -530,7 +620,7 @@ void updateLCD() {
   } else if (timerStatusMessage == 5) {
     lcd.print("TIMER MODE      ");
   } else {
-    lcd.print("                ");  // Clear bottom row
+    lcd.print("                ");
   }
 }
 
@@ -545,7 +635,6 @@ void sendToSubsystem() {
       d3 = clockDigits[3];
     } else {
       DateTime now = rtc.now();
-      // Convert to 12-hour format for subsystem display
       int h12;
       bool isPM;
       convert24to12(now.hour(), h12, isPM);
@@ -575,8 +664,7 @@ void updateBuzzerSequence() {
 
   BuzzerNote* pattern = nullptr;
   int patternLen = 0;
-  
-  // Select pattern
+
   switch(buzzerPatternType) {
     case 1:
       pattern = startupPattern;
@@ -602,21 +690,18 @@ void updateBuzzerSequence() {
       buzzerActive = false;
       return;
   }
-  
-  // Check if we've finished all notes
+
   if (currentPatternIndex >= patternLen) {
     noTone(BUZZER);
     buzzerActive = false;
     currentPatternIndex = 0;
     return;
   }
-  
-  // Get current note
+
   BuzzerNote currentNote = pattern[currentPatternIndex];
   unsigned long noteDuration = currentNote.duration;
   unsigned long noteElapsed = millis() - patternNoteStart;
-  
-  // Play or silence the current frequency
+
   if (noteElapsed < noteDuration) {
     if (currentNote.frequency > 0) {
       tone(BUZZER, currentNote.frequency);
@@ -624,7 +709,6 @@ void updateBuzzerSequence() {
       noTone(BUZZER);
     }
   } else {
-    // Move to next note
     currentPatternIndex++;
     patternNoteStart = millis();
     noTone(BUZZER);
