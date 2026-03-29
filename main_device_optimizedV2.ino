@@ -121,13 +121,6 @@ unsigned long patternNoteStart = 0;
 bool alert10MinTriggered = false;
 bool alert1MinTriggered = false;
 
-
-
-// Keypad debouncing to prevent spurious inputs from power noise
-char lastValidKey = 0;
-unsigned long lastKeyTime = 0;
-const unsigned long KEY_DEBOUNCE_MS = 80;  // Minimum 80ms between valid key presses
-
 const byte ROWS = 4;
 const byte COLS = 4;
 
@@ -268,27 +261,6 @@ void updateBlink() {
 void readKeypad() {
   char key = keypad.getKey();
   if (!key) return;
-  
-  // DEBOUNCING: Ignore if same key pressed too quickly or if key is invalid
-  unsigned long currentTime = millis();
-  
-  // Only accept valid keys: digits, *, #, and A/B/C/D
-  bool isValidKey = (key >= '0' && key <= '9') || key == '*' || key == '#' || 
-                    key == 'A' || key == 'B' || key == 'C' || key == 'D';
-  
-  if (!isValidKey) {
-    Serial.print("INVALID KEY DETECTED: ");
-    Serial.println(key);
-    return;  // Reject invalid keys (garbage from power noise)
-  }
-  
-  // Debounce: ignore if this key was just pressed
-  if (lastValidKey == key && (currentTime - lastKeyTime < KEY_DEBOUNCE_MS)) {
-    return;  // Ignore duplicate rapid presses
-  }
-  
-  lastValidKey = key;
-  lastKeyTime = currentTime;
 
   // Numeric input: 0-9 OR AM/PM selection (1=AM, 2=PM)
   if (key >= '0' && key <= '9' && settingMode) {
