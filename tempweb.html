@@ -1,0 +1,875 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Timer Clock - ESP32</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        /* ====== AUTHENTICATION STYLES ====== */
+
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            width: 100%;
+            max-width: 450px;
+            padding: 40px;
+        }
+
+        .auth-container {
+            position: relative;
+        }
+
+        .auth-form {
+            display: none;
+            animation: slideIn 0.3s ease-in-out;
+        }
+
+        .auth-form.active {
+            display: block;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .auth-form h2 {
+            color: #333;
+            margin-bottom: 30px;
+            text-align: center;
+            font-size: 2em;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 0.95em;
+            color: #555;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn-primary {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-top: 10px;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .form-switch {
+            text-align: center;
+            margin-top: 20px;
+            color: #666;
+            font-size: 0.95em;
+        }
+
+        .form-switch a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .form-switch a:hover {
+            text-decoration: underline;
+        }
+
+        /* ====== NAVBAR STYLES ====== */
+
+        .navbar {
+            background: white;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            padding: 15px 0;
+            margin-bottom: 30px;
+        }
+
+        .nav-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 20px;
+        }
+
+        .nav-title {
+            color: #667eea;
+            font-size: 1.8em;
+        }
+
+        .user-menu {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .user-name {
+            color: #555;
+            font-weight: 600;
+            font-size: 1.05em;
+        }
+
+        .btn-logout {
+            background: #e74c3c;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .btn-logout:hover {
+            background: #c0392b;
+            transform: translateY(-2px);
+        }
+
+        /* ====== APP CONTAINER STYLES ====== */
+
+        .app-container {
+            min-height: 100vh;
+            padding-bottom: 40px;
+        }
+
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        .clock-display {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        .time {
+            font-size: 3.5em;
+            font-weight: bold;
+            color: white;
+            font-family: 'Courier New', monospace;
+            letter-spacing: 5px;
+        }
+
+        .timer-section {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
+        }
+
+        .input-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .input-field label {
+            display: block;
+            font-size: 0.9em;
+            color: #666;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+
+        .input-field input {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1em;
+            text-align: center;
+            transition: border-color 0.3s;
+        }
+
+        .input-field input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .timer-display {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 25px;
+            text-align: center;
+            border: 2px solid #667eea;
+        }
+
+        #timerDisplay {
+            font-size: 3em;
+            color: #667eea;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 12px;
+            font-size: 0.95em;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn-start {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-start:hover:not(:disabled) {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-pause {
+            background: #ffa502;
+            color: white;
+        }
+
+        .btn-pause:hover:not(:disabled) {
+            background: #ff9500;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(255, 165, 2, 0.4);
+        }
+
+        .btn-reset {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .btn-reset:hover:not(:disabled) {
+            background: #c0392b;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(231, 76, 60, 0.4);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #ddd;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            width: 100%;
+            transition: width 0.1s linear;
+        }
+
+        /* ====== HISTORY SECTION ====== */
+
+        .history-section {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        .history-section h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+
+        .history-list {
+            list-style: none;
+        }
+
+        .history-list li {
+            padding: 12px;
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .history-list li:last-child {
+            margin-bottom: 0;
+        }
+
+        .history-time {
+            font-weight: 600;
+            color: #667eea;
+            font-size: 1.1em;
+        }
+
+        .history-date {
+            font-size: 0.85em;
+            color: #999;
+        }
+
+        /* ====== RESPONSIVE DESIGN ====== */
+
+        @media (max-width: 600px) {
+            .modal-content {
+                padding: 30px;
+                margin: 20px;
+            }
+
+            .nav-container {
+                flex-direction: column;
+                gap: 15px;
+            }
+
+            .nav-title {
+                font-size: 1.5em;
+            }
+
+            .user-menu {
+                width: 100%;
+                justify-content: space-between;
+            }
+
+            .container {
+                padding: 0 15px;
+            }
+
+            .time {
+                font-size: 2.5em;
+            }
+
+            .input-group {
+                grid-template-columns: 1fr;
+            }
+
+            .button-group {
+                flex-direction: column;
+            }
+
+            #timerDisplay {
+                font-size: 2.5em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Auth Modal -->
+    <div id="authModal" class="modal">
+        <div class="modal-content">
+            <div class="auth-container">
+                <!-- Login Form -->
+                <div id="loginForm" class="auth-form active">
+                    <h2>Login</h2>
+                    <form id="loginFormElement">
+                        <div class="form-group">
+                            <label for="loginEmail">Email:</label>
+                            <input type="email" id="loginEmail" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="loginPassword">Password:</label>
+                            <input type="password" id="loginPassword" required>
+                        </div>
+                        <button type="submit" class="btn-primary">Login</button>
+                    </form>
+                    <p class="form-switch">Don't have an account? <a onclick="switchForm('signup')">Sign Up</a></p>
+                </div>
+
+                <!-- Sign Up Form -->
+                <div id="signupForm" class="auth-form">
+                    <h2>Sign Up</h2>
+                    <form id="signupFormElement">
+                        <div class="form-group">
+                            <label for="signupName">Full Name:</label>
+                            <input type="text" id="signupName" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="signupEmail">Email:</label>
+                            <input type="email" id="signupEmail" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="signupPassword">Password:</label>
+                            <input type="password" id="signupPassword" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="signupConfirmPassword">Confirm Password:</label>
+                            <input type="password" id="signupConfirmPassword" required>
+                        </div>
+                        <button type="submit" class="btn-primary">Sign Up</button>
+                    </form>
+                    <p class="form-switch">Already have an account? <a onclick="switchForm('login')">Login</a></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main App -->
+    <div id="appContainer" class="app-container" style="display:none;">
+        <!-- Top Navigation -->
+        <nav class="navbar">
+            <div class="nav-container">
+                <h1 class="nav-title">⏱️ Timer Clock</h1>
+                <div class="user-menu">
+                    <span id="userDisplayName" class="user-name"></span>
+                    <button id="logoutBtn" class="btn-logout">Logout</button>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <div class="container">
+            <div class="clock-display">
+                <div class="time" id="clockDisplay">00:00:00</div>
+            </div>
+
+            <div class="timer-section">
+                <div class="input-group">
+                    <div class="input-field">
+                        <label for="hours">Hours:</label>
+                        <input type="number" id="hours" min="0" max="23" value="0">
+                    </div>
+                    
+                    <div class="input-field">
+                        <label for="minutes">Minutes:</label>
+                        <input type="number" id="minutes" min="0" max="59" value="1">
+                    </div>
+                    
+                    <div class="input-field">
+                        <label for="seconds">Seconds:</label>
+                        <input type="number" id="seconds" min="0" max="59" value="0">
+                    </div>
+                </div>
+
+                <div class="timer-display">
+                    <div class="time" id="timerDisplay">00:01:00</div>
+                </div>
+
+                <div class="button-group">
+                    <button id="startBtn" class="btn btn-start">Start</button>
+                    <button id="pauseBtn" class="btn btn-pause" disabled>Pause</button>
+                    <button id="resetBtn" class="btn btn-reset">Reset</button>
+                </div>
+
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+            </div>
+
+            <!-- Timer History -->
+            <div class="history-section">
+                <h3>Recent Timers</h3>
+                <ul id="timerHistory" class="history-list"></ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class TimerClockApp {
+            constructor() {
+                // Auth elements
+                this.authModal = document.getElementById('authModal');
+                this.loginForm = document.getElementById('loginForm');
+                this.signupForm = document.getElementById('signupForm');
+                this.loginFormElement = document.getElementById('loginFormElement');
+                this.signupFormElement = document.getElementById('signupFormElement');
+                
+                // App elements
+                this.appContainer = document.getElementById('appContainer');
+                this.clockDisplay = document.getElementById('clockDisplay');
+                this.userDisplayName = document.getElementById('userDisplayName');
+                this.logoutBtn = document.getElementById('logoutBtn');
+                
+                // Timer elements
+                this.timerDisplay = document.getElementById('timerDisplay');
+                this.hoursInput = document.getElementById('hours');
+                this.minutesInput = document.getElementById('minutes');
+                this.secondsInput = document.getElementById('seconds');
+                this.progressFill = document.getElementById('progressFill');
+                this.timerHistory = document.getElementById('timerHistory');
+                
+                // Buttons
+                this.startBtn = document.getElementById('startBtn');
+                this.pauseBtn = document.getElementById('pauseBtn');
+                this.resetBtn = document.getElementById('resetBtn');
+                
+                // Timer state
+                this.totalSeconds = 0;
+                this.remainingSeconds = 0;
+                this.isRunning = false;
+                this.timerInterval = null;
+                
+                // User data
+                this.users = JSON.parse(localStorage.getItem('users')) || [];
+                this.currentUser = JSON.parse(localStorage.getItem('currentUser')) || null;
+                this.userTimers = JSON.parse(localStorage.getItem('userTimers')) || {};
+                
+                // Initialize
+                this.init();
+            }
+            
+            init() {
+                if (this.currentUser) {
+                    this.showApp();
+                    this.initTimer();
+                } else {
+                    this.showAuth();
+                }
+                
+                // Event listeners for auth
+                this.loginFormElement.addEventListener('submit', (e) => this.handleLogin(e));
+                this.signupFormElement.addEventListener('submit', (e) => this.handleSignup(e));
+                this.logoutBtn.addEventListener('click', () => this.handleLogout());
+            }
+            
+            // ====== AUTHENTICATION METHODS ======
+            
+            handleLogin(e) {
+                e.preventDefault();
+                
+                const email = document.getElementById('loginEmail').value;
+                const password = document.getElementById('loginPassword').value;
+                
+                const user = this.users.find(u => u.email === email && u.password === password);
+                
+                if (user) {
+                    this.currentUser = { id: user.id, name: user.name, email: user.email };
+                    localStorage.setItem('currentUser', JSON.stringify(this.currentUser));
+                    this.showApp();
+                    this.initTimer();
+                    this.loginFormElement.reset();
+                } else {
+                    alert('Invalid email or password!');
+                }
+            }
+            
+            handleSignup(e) {
+                e.preventDefault();
+                
+                const name = document.getElementById('signupName').value;
+                const email = document.getElementById('signupEmail').value;
+                const password = document.getElementById('signupPassword').value;
+                const confirmPassword = document.getElementById('signupConfirmPassword').value;
+                
+                if (password !== confirmPassword) {
+                    alert('Passwords do not match!');
+                    return;
+                }
+                
+                if (this.users.find(u => u.email === email)) {
+                    alert('Email already exists!');
+                    return;
+                }
+                
+                const newUser = {
+                    id: Date.now(),
+                    name: name,
+                    email: email,
+                    password: password
+                };
+                
+                this.users.push(newUser);
+                localStorage.setItem('users', JSON.stringify(this.users));
+                
+                alert('Account created successfully! Please login.');
+                switchForm('login');
+                this.signupFormElement.reset();
+            }
+            
+            handleLogout() {
+                if (confirm('Are you sure you want to logout?')) {
+                    this.currentUser = null;
+                    localStorage.removeItem('currentUser');
+                    clearInterval(this.timerInterval);
+                    this.showAuth();
+                    this.loginForm.classList.add('active');
+                    this.signupForm.classList.remove('active');
+                }
+            }
+            
+            showAuth() {
+                this.authModal.style.display = 'flex';
+                this.appContainer.style.display = 'none';
+            }
+            
+            showApp() {
+                this.authModal.style.display = 'none';
+                this.appContainer.style.display = 'block';
+                this.userDisplayName.textContent = `Welcome, ${this.currentUser.name}!`;
+            }
+            
+            // ====== TIMER METHODS ======
+            
+            initTimer() {
+                this.updateClock();
+                setInterval(() => this.updateClock(), 1000);
+                
+                this.startBtn.addEventListener('click', () => this.start());
+                this.pauseBtn.addEventListener('click', () => this.pause());
+                this.resetBtn.addEventListener('click', () => this.reset());
+                
+                [this.hoursInput, this.minutesInput, this.secondsInput].forEach(input => {
+                    input.addEventListener('change', () => this.updateTimerDisplay());
+                });
+                
+                this.updateTimerDisplay();
+                this.loadUserTimers();
+            }
+            
+            updateClock() {
+                const now = new Date();
+                const hours = String(now.getHours()).padStart(2, '0');
+                const minutes = String(now.getMinutes()).padStart(2, '0');
+                const seconds = String(now.getSeconds()).padStart(2, '0');
+                
+                this.clockDisplay.textContent = `${hours}:${minutes}:${seconds}`;
+            }
+            
+            updateTimerDisplay() {
+                const hours = parseInt(this.hoursInput.value) || 0;
+                const minutes = parseInt(this.minutesInput.value) || 0;
+                const seconds = parseInt(this.secondsInput.value) || 0;
+                
+                this.totalSeconds = hours * 3600 + minutes * 60 + seconds;
+                this.remainingSeconds = this.totalSeconds;
+                
+                this.displayTime(this.remainingSeconds);
+                this.updateProgress();
+            }
+            
+            displayTime(seconds) {
+                const hrs = Math.floor(seconds / 3600);
+                const mins = Math.floor((seconds % 3600) / 60);
+                const secs = seconds % 60;
+                
+                this.timerDisplay.textContent = 
+                    `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+            }
+            
+            start() {
+                if (this.isRunning || this.totalSeconds === 0) return;
+                
+                this.isRunning = true;
+                this.startBtn.disabled = true;
+                this.pauseBtn.disabled = false;
+                [this.hoursInput, this.minutesInput, this.secondsInput].forEach(input => input.disabled = true);
+                
+                this.timerInterval = setInterval(() => {
+                    this.remainingSeconds--;
+                    this.displayTime(this.remainingSeconds);
+                    this.updateProgress();
+                    
+                    if (this.remainingSeconds <= 0) {
+                        this.timerComplete();
+                    }
+                }, 1000);
+            }
+            
+            pause() {
+                if (!this.isRunning) return;
+                
+                this.isRunning = false;
+                clearInterval(this.timerInterval);
+                
+                this.startBtn.disabled = false;
+                this.pauseBtn.disabled = true;
+            }
+            
+            reset() {
+                clearInterval(this.timerInterval);
+                this.isRunning = false;
+                
+                this.startBtn.disabled = false;
+                this.pauseBtn.disabled = true;
+                [this.hoursInput, this.minutesInput, this.secondsInput].forEach(input => input.disabled = false);
+                
+                this.updateTimerDisplay();
+            }
+            
+            timerComplete() {
+                clearInterval(this.timerInterval);
+                this.isRunning = false;
+                
+                this.startBtn.disabled = false;
+                this.pauseBtn.disabled = true;
+                [this.hoursInput, this.minutesInput, this.secondsInput].forEach(input => input.disabled = false);
+                
+                // Save timer to history
+                this.saveTimerToHistory();
+                
+                this.playAlert();
+                alert('Timer Complete!');
+            }
+            
+            updateProgress() {
+                const percentage = (this.totalSeconds - this.remainingSeconds) / this.totalSeconds * 100;
+                this.progressFill.style.width = percentage + '%';
+            }
+            
+            playAlert() {
+                try {
+                    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    const oscillator = audioContext.createOscillator();
+                    const gainNode = audioContext.createGain();
+                    
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioContext.destination);
+                    
+                    oscillator.frequency.value = 1000;
+                    oscillator.type = 'sine';
+                    
+                    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+                    
+                    oscillator.start(audioContext.currentTime);
+                    oscillator.stop(audioContext.currentTime + 0.5);
+                } catch(e) {
+                    console.log('Audio not available');
+                }
+            }
+            
+            // ====== TIMER HISTORY ======
+            
+            saveTimerToHistory() {
+                const userId = this.currentUser.id;
+                if (!this.userTimers[userId]) {
+                    this.userTimers[userId] = [];
+                }
+                
+                const hours = this.hoursInput.value;
+                const minutes = this.minutesInput.value;
+                const seconds = this.secondsInput.value;
+                const timeString = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+                
+                this.userTimers[userId].push({
+                    time: timeString,
+                    date: new Date().toLocaleString()
+                });
+                
+                localStorage.setItem('userTimers', JSON.stringify(this.userTimers));
+                this.loadUserTimers();
+            }
+            
+            loadUserTimers() {
+                const userId = this.currentUser.id;
+                const timers = this.userTimers[userId] || [];
+                
+                this.timerHistory.innerHTML = '';
+                
+                if (timers.length === 0) {
+                    this.timerHistory.innerHTML = '<li>No timers yet</li>';
+                    return;
+                }
+                
+                timers.slice().reverse().forEach(timer => {
+                    const li = document.createElement('li');
+                    li.innerHTML = `
+                        <div>
+                            <div class="history-time">${timer.time}</div>
+                            <div class="history-date">${timer.date}</div>
+                        </div>
+                    `;
+                    this.timerHistory.appendChild(li);
+                });
+            }
+        }
+
+        // Global function for form switching
+        function switchForm(formType) {
+            const loginForm = document.getElementById('loginForm');
+            const signupForm = document.getElementById('signupForm');
+            
+            if (formType === 'login') {
+                loginForm.classList.add('active');
+                signupForm.classList.remove('active');
+            } else {
+                signupForm.classList.add('active');
+                loginForm.classList.remove('active');
+            }
+        }
+
+        // Initialize app when DOM is loaded
+        document.addEventListener('DOMContentLoaded', () => {
+            new TimerClockApp();
+        });
+    </script>
+</body>
+</html>
+

@@ -104,46 +104,96 @@ BuzzerNote pausePattern[] = {
 };
 const int pausePatternLen = 16;
 
+// 60-minute alert: 3 loud buzzes with 2-second delays
+BuzzerNote alert60MinPattern[] = {
+  {LOUD_TONE, 300}, {-1, 2000},
+  {LOUD_TONE, 300}, {-1, 2000},
+  {LOUD_TONE, 300}, {-1, 2000}
+};
+const int alert60MinPatternLen = 6;
+
+// 45-minute alert: 2 loud buzzes with 2-second delays
+BuzzerNote alert45MinPattern[] = {
+  {LOUD_TONE, 300}, {-1, 2000},
+  {LOUD_TONE, 300}, {-1, 2000}
+};
+const int alert45MinPatternLen = 4;
+
+// 30-minute alert: 4 loud buzzes with 2-second delays
+BuzzerNote alert30MinPattern[] = {
+  {LOUD_TONE, 300}, {-1, 2000},
+  {LOUD_TONE, 300}, {-1, 2000},
+  {LOUD_TONE, 300}, {-1, 2000},
+  {LOUD_TONE, 300}, {-1, 2000}
+};
+const int alert30MinPatternLen = 8;
+
+// 15-minute alert: 3 loud beeps + 2 soft beeps with 2-second delays
+BuzzerNote alert15MinPattern[] = {
+  {LOUD_TONE, 300}, {-1, 2000},
+  {LOUD_TONE, 300}, {-1, 2000},
+  {LOUD_TONE, 300}, {-1, 2000},
+  {LOW_TONE, 300}, {-1, 2000},
+  {LOW_TONE, 300}, {-1, 2000}
+};
+const int alert15MinPatternLen = 10;
+
+// 10-minute alert: 5 loud beeps with 2-second delays
 BuzzerNote alert10MinPattern[] = {
-  {LOUD_TONE, 300}, {-1, 650},
-  {LOUD_TONE, 300}, {-1, 650},
-  {LOUD_TONE, 300}, {-1, 650},
-  {LOUD_TONE, 300}, {-1, 650},
-  {LOUD_TONE, 300}, {-1, 650}
+  {LOUD_TONE, 300}, {-1, 2000},
+  {LOUD_TONE, 300}, {-1, 2000},
+  {LOUD_TONE, 300}, {-1, 2000},
+  {LOUD_TONE, 300}, {-1, 2000},
+  {LOUD_TONE, 300}, {-1, 2000}
 };
 const int alert10MinPatternLen = 10;
 
-BuzzerNote alert1MinPattern[] = {
-  {VERY_LOUD_TONE, 250}, {-1, 350},
-  {VERY_LOUD_TONE, 250}, {-1, 350},
-  {VERY_LOUD_TONE, 250}, {-1, 350},
-  {VERY_LOUD_TONE, 250}, {-1, 350},
-  {VERY_LOUD_TONE, 250}, {-1, 350},
-  {VERY_LOUD_TONE, 250}, {-1, 350},
-  {VERY_LOUD_TONE, 250}, {-1, 350},
-  {VERY_LOUD_TONE, 250}, {-1, 350},
-  {VERY_LOUD_TONE, 250}, {-1, 350},
-  {VERY_LOUD_TONE, 250}, {-1, 350},
-  {VERY_LOUD_TONE, 300}, {-1, 450},
-  {VERY_LOUD_TONE, 300}, {-1, 450}
+// 5-minute alert: 6 loud beeps with 2-second delays
+BuzzerNote alert5MinPattern[] = {
+  {LOUD_TONE, 300}, {-1, 2000},
+  {LOUD_TONE, 300}, {-1, 2000},
+  {LOUD_TONE, 300}, {-1, 2000},
+  {LOUD_TONE, 300}, {-1, 2000},
+  {LOUD_TONE, 300}, {-1, 2000},
+  {LOUD_TONE, 300}, {-1, 2000}
 };
-const int alert1MinPatternLen = 24;
+const int alert5MinPatternLen = 12;
 
-BuzzerNote completionPattern[] = {
-  {LOUD_TONE, 300}, {-1, 400},
-  {LOUD_TONE, 300}, {-1, 500},
-  {LOW_TONE, 300}, {-1, 500},
-  {LOUD_TONE, 300}, {-1, 400},
-  {LOW_TONE, 300}, {-1, 400},
-  {LOUD_TONE, 300}, {-1, 500}
+// 1-minute alert: 7 very loud beeps with 2-second delays
+BuzzerNote alert1MinPattern[] = {
+  {VERY_LOUD_TONE, 300}, {-1, 2000},
+  {VERY_LOUD_TONE, 300}, {-1, 2000},
+  {VERY_LOUD_TONE, 300}, {-1, 2000},
+  {VERY_LOUD_TONE, 300}, {-1, 2000},
+  {VERY_LOUD_TONE, 300}, {-1, 2000},
+  {VERY_LOUD_TONE, 300}, {-1, 2000},
+  {VERY_LOUD_TONE, 300}, {-1, 2000}
 };
-const int completionPatternLen = 12;
+const int alert1MinPatternLen = 14;
+
+// Completion alert: 5 very loud beeps, pause, then 3 very loud beeps
+BuzzerNote completionPattern[] = {
+  {VERY_LOUD_TONE, 300}, {-1, 2000},
+  {VERY_LOUD_TONE, 300}, {-1, 2000},
+  {VERY_LOUD_TONE, 300}, {-1, 2000},
+  {VERY_LOUD_TONE, 300}, {-1, 2000},
+  {VERY_LOUD_TONE, 300}, {-1, 3000},
+  {VERY_LOUD_TONE, 300}, {-1, 2000},
+  {VERY_LOUD_TONE, 300}, {-1, 2000},
+  {VERY_LOUD_TONE, 300}, {-1, 2000}
+};
+const int completionPatternLen = 16;
 
 int currentPatternIndex = 0;
 unsigned long patternNoteStart = 0;
 
 // Alert tracking
+bool alert60MinTriggered = false;
+bool alert45MinTriggered = false;
+bool alert30MinTriggered = false;
+bool alert15MinTriggered = false;
 bool alert10MinTriggered = false;
+bool alert5MinTriggered = false;
 bool alert1MinTriggered = false;
 
 // ==================== Keypad Configuration ====================
@@ -519,18 +569,70 @@ void updateTimer() {
       timerDigits[2] = m / 10;
       timerDigits[3] = m % 10;
 
-      if (remainingSeconds == 600 && !alert10MinTriggered) {
-        alert10MinTriggered = true;
-        buzzerPatternType = 3;
+      // Check for 60-minute threshold (3600 seconds)
+      if (remainingSeconds == 3600 && !alert60MinTriggered) {
+        alert60MinTriggered = true;
+        buzzerPatternType = 3;  // 60-min alert
         buzzerActive = true;
         buzzerStartTime = millis();
         patternNoteStart = millis();
         currentPatternIndex = 0;
       }
-
+      
+      // Check for 45-minute threshold (2700 seconds)
+      if (remainingSeconds == 2700 && !alert45MinTriggered) {
+        alert45MinTriggered = true;
+        buzzerPatternType = 4;  // 45-min alert
+        buzzerActive = true;
+        buzzerStartTime = millis();
+        patternNoteStart = millis();
+        currentPatternIndex = 0;
+      }
+      
+      // Check for 30-minute threshold (1800 seconds)
+      if (remainingSeconds == 1800 && !alert30MinTriggered) {
+        alert30MinTriggered = true;
+        buzzerPatternType = 5;  // 30-min alert
+        buzzerActive = true;
+        buzzerStartTime = millis();
+        patternNoteStart = millis();
+        currentPatternIndex = 0;
+      }
+      
+      // Check for 15-minute threshold (900 seconds)
+      if (remainingSeconds == 900 && !alert15MinTriggered) {
+        alert15MinTriggered = true;
+        buzzerPatternType = 6;  // 15-min alert
+        buzzerActive = true;
+        buzzerStartTime = millis();
+        patternNoteStart = millis();
+        currentPatternIndex = 0;
+      }
+      
+      // Check for 10-minute threshold (600 seconds)
+      if (remainingSeconds == 600 && !alert10MinTriggered) {
+        alert10MinTriggered = true;
+        buzzerPatternType = 7;  // 10-min alert
+        buzzerActive = true;
+        buzzerStartTime = millis();
+        patternNoteStart = millis();
+        currentPatternIndex = 0;
+      }
+      
+      // Check for 5-minute threshold (300 seconds)
+      if (remainingSeconds == 300 && !alert5MinTriggered) {
+        alert5MinTriggered = true;
+        buzzerPatternType = 8;  // 5-min alert
+        buzzerActive = true;
+        buzzerStartTime = millis();
+        patternNoteStart = millis();
+        currentPatternIndex = 0;
+      }
+      
+      // Check for 1-minute threshold (60 seconds)
       if (remainingSeconds == 60 && !alert1MinTriggered) {
         alert1MinTriggered = true;
-        buzzerPatternType = 4;
+        buzzerPatternType = 9;  // 1-min alert
         buzzerActive = true;
         buzzerStartTime = millis();
         patternNoteStart = millis();
@@ -538,7 +640,7 @@ void updateTimer() {
       }
     } else {
       timerRunning = false;
-      buzzerPatternType = 5;
+      buzzerPatternType = 10;  // Completion sequence
       buzzerActive = true;
       buzzerStartTime = millis();
       patternNoteStart = millis();
@@ -685,14 +787,34 @@ void updateBuzzerSequence() {
       patternLen = pausePatternLen;
       break;
     case 3:
+      pattern = alert60MinPattern;
+      patternLen = alert60MinPatternLen;
+      break;
+    case 4:
+      pattern = alert45MinPattern;
+      patternLen = alert45MinPatternLen;
+      break;
+    case 5:
+      pattern = alert30MinPattern;
+      patternLen = alert30MinPatternLen;
+      break;
+    case 6:
+      pattern = alert15MinPattern;
+      patternLen = alert15MinPatternLen;
+      break;
+    case 7:
       pattern = alert10MinPattern;
       patternLen = alert10MinPatternLen;
       break;
-    case 4:
+    case 8:
+      pattern = alert5MinPattern;
+      patternLen = alert5MinPatternLen;
+      break;
+    case 9:
       pattern = alert1MinPattern;
       patternLen = alert1MinPatternLen;
       break;
-    case 5:
+    case 10:
       pattern = completionPattern;
       patternLen = completionPatternLen;
       break;
