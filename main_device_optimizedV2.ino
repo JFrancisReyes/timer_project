@@ -535,7 +535,6 @@ void updateLCD() {
 }
 
 void sendToSubsystem() {
-  char buffer[10];
   int d0, d1, d2, d3;
 
   if (displayClock) {
@@ -562,8 +561,13 @@ void sendToSubsystem() {
     d3 = timerDigits[3];
   }
 
-  sprintf(buffer, "%d%d%d%d%d%d\n", d0, d1, d2, d3, settingMode, cursorPos);
-  SubSerial.print(buffer);
+  SubSerial.print(d0);
+  SubSerial.print(d1);
+  SubSerial.print(d2);
+  SubSerial.print(d3);
+  SubSerial.print(settingMode);
+  SubSerial.print(cursorPos);
+  SubSerial.print('\n');
 }
 
 void updateBuzzerSequence() {
