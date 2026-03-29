@@ -60,56 +60,12 @@ void setup() {
     pinMode(displayPins[i].C, OUTPUT);
     pinMode(displayPins[i].D, OUTPUT);
   }
-  
-  // HARD RESET: Initialize all volatile state variables to safe defaults
-  resetAllStates();
 }
 
 void loop() {
   readSerial();
   updateBlink();
   updateDisplay();
-}
-
-// HARD RESET: Initialize all volatile state variables to safe defaults
-// This prevents corruption bugs after sudden power loss
-void resetAllStates() {
-  // Display digits
-  for (int i = 0; i < 4; i++) {
-    digits[i] = 0;
-  }
-  
-  // UI state
-  settingMode = false;
-  cursorPos = 0;
-  
-  // Blink state
-  blinkState = true;
-  blinkTimer = millis();
-  
-  // Serial buffer
-  for (int i = 0; i < 12; i++) {
-    buffer[i] = 0;
-  }
-  bufferIndex = 0;
-  
-  // Boot delay timer
-  bootStartTime = millis();
-  
-  // Flush any pending serial data
-  while (Serial2.available()) {
-    Serial2.read();  // Clear the buffer
-  }
-  
-  // Clear all displays
-  for (int i = 0; i < 4; i++) {
-    digitalWrite(displayPins[i].A, LOW);
-    digitalWrite(displayPins[i].B, LOW);
-    digitalWrite(displayPins[i].C, LOW);
-    digitalWrite(displayPins[i].D, LOW);
-  }
-  
-  Serial.println("Subsystem states reset to safe defaults!");
 }
 
 void updateBlink() {
