@@ -15,13 +15,11 @@ HardwareSerial SubSerial(2);
 #define TX_SUB 17
 #define RX_SUB 16
 #define BUZZER 4
-#define EEPROM_AM_PM_ADDRESS 0  // EEPROM address for AM/PM storage
 
 int timerDigits[4] = {0, 0, 0, 0};
 int clockDigits[4] = {0, 0, 0, 0};
-bool clockPM = false;
 
-int clockCursorPos = 0;  // Cursor position for clock mode (0-4)
+int clockCursorPos = 0;  // Cursor position for clock mode (0-3)
 int timerCursorPos = 0;  // Cursor position for timer mode (0-3)
 int cursorPos = 0;       // Active cursor position (mirror of clock or timer)
 
@@ -123,9 +121,7 @@ unsigned long patternNoteStart = 0;
 bool alert10MinTriggered = false;
 bool alert1MinTriggered = false;
 
-// Auto-sync AM/PM on hour transitions only
-unsigned long lastClockEditTime = 0;
-int lastTrackedHour = -1;  // Track last hour to detect transitions
+
 
 // Keypad debouncing to prevent spurious inputs from power noise
 char lastValidKey = 0;
@@ -179,15 +175,13 @@ void setup() {
   
   loadClockDigits();
   
-  // Initialize hour tracking for AM/PM auto-sync on transitions
-  DateTime now = rtc.now();
-  lastTrackedHour = now.hour();
+
 }
 
 void loop() {
   // SAFETY CHECK: Ensure cursor positions never go out of bounds
   if (displayClock) {
-    if (clockCursorPos < 0 || clockCursorPos > 4) {
+    if (clockCursorPos < 0 || clockCursorPos > 3) {
       Serial.println("WARNING: clockCursorPos out of bounds! Resetting to 0");
       clockCursorPos = 0;
     }
@@ -301,18 +295,8 @@ void readKeypad() {
     int value = key - '0';
 
     if (displayClock) {
-      // Position 4 is AM/PM selector - only allow 1 (AM) or 2 (PM)
-      if (clockCursorPos == 4) {
-        if (key == '1') {
-          clockPM = false;  // 1 = AM
-          lastClockEditTime = millis();  // Reset grace period
-        } else if (key == '2') {
-          clockPM = true;   // 2 = PM
-          lastClockEditTime = millis();  // Reset grace period
-        }
-      } else if (validClockDigit(clockCursorPos, value)) {
+      if (validClockDigit(clockCursorPos, value)) {
         clockDigits[clockCursorPos] = value;
-        lastClockEditTime = millis();  // Reset grace period
         moveCursorRight();
       }
     } else {
@@ -435,20 +419,6 @@ void loadClockDigits() {
   clockDigits[1] = now.hour() % 10;
   clockDigits[2] = now.minute() / 10;
   clockDigits[3] = now.minute() % 10;
-  
-  // Load AM/PM setting from EEPROM with validation
-  EEPROM.begin(512);  // Initialize EEPROM (512 bytes)
-  int eepromValue = EEPROM.read(EEPROM_AM_PM_ADDRESS);
-  
-  // Validate EEPROM: if corrupted (not 0 or 1), reset to 0 (AM)
-  if (eepromValue != 0 && eepromValue != 1) {
-    Serial.println("EEPROM corrupted! Resetting AM/PM to AM (0)");
-    EEPROM.write(EEPROM_AM_PM_ADDRESS, 0);
-    EEPROM.commit();
-    clockPM = false;
-  } else {
-    clockPM = (eepromValue != 0);
-  }
 }
 
 void saveClock() {
@@ -456,11 +426,6 @@ void saveClock() {
   int h = clockDigits[0] * 10 + clockDigits[1];
   int m = clockDigits[2] * 10 + clockDigits[3];
   rtc.adjust(DateTime(now.year(), now.month(), now.day(), h, m, 0));
-  
-  // Save AM/PM setting to EEPROM
-  EEPROM.begin(512);  // Initialize EEPROM (512 bytes)
-  EEPROM.write(EEPROM_AM_PM_ADDRESS, clockPM ? 1 : 0);
-  EEPROM.commit();  // Commit changes to flash
 }
 
 bool validTimerDigit(int pos, int value) {
@@ -474,9 +439,6 @@ bool validTimerDigit(int pos, int value) {
 }
 
 bool validClockDigit(int pos, int value) {
-  // Position 4 is AM/PM selector - not a regular digit
-  if (pos == 4) return false;
-  
   if (pos == 0) return value <= 2;
   if (pos == 1) {
     if (clockDigits[0] == 2) return value <= 3;
@@ -489,7 +451,7 @@ bool validClockDigit(int pos, int value) {
 void moveCursorRight() {
   if (displayClock) {
     clockCursorPos++;
-    if (clockCursorPos > 4) clockCursorPos = 4;
+    if (clockCursorPos > 3) clockCursorPos = 3;
     cursorPos = clockCursorPos;
   } else {
     timerCursorPos++;
@@ -601,19 +563,6 @@ void updateLCD() {
     int h12;
     bool isPM;
     convert24to12(h, h12, isPM);
-    
-    // Auto-sync AM/PM only when hour changes (on natural time transitions at 12:00 or 00:00)
-    if (!settingMode) {
-      int currentHour = now.hour();
-      if (lastTrackedHour != currentHour) {
-        // Hour changed - sync AM/PM with RTC
-        clockPM = (currentHour >= 12);
-        lastTrackedHour = currentHour;
-      }
-    }
-    
-    // Use the manually-set or auto-synced clockPM value
-    isPM = clockPM;
 
     printDigit(0, h12 / 10);
     printDigit(1, h12 % 10);
@@ -628,17 +577,6 @@ void updateLCD() {
 
     if (now.second() < 10) lcd.print("0");
     lcd.print(now.second());
-
-    // Display AM/PM at positions 12-13 with blinking support
-    lcd.setCursor(12, 0);
-    
-    if (settingMode && cursorPos == 4 && !blinkState) {
-      lcd.print(" ");  // Blinking cursor on AM/PM
-    } else {
-      lcd.print(isPM ? "P" : "A");
-    }
-    
-    lcd.print("M");  // Static "M"
   } else {
     lcd.print("T ");
 
@@ -662,10 +600,6 @@ void updateLCD() {
 
     if (timerRunning) lcd.print("G");
     else lcd.print("P");
-    
-    // Clear AM/PM positions (12-13) when in timer mode
-    lcd.setCursor(12, 0);
-    lcd.print("  ");
   }
   
   // Display bottom row: SET MODE or Status Message or blank
