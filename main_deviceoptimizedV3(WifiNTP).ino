@@ -813,10 +813,10 @@ void sendToSubsystem() {
       d3 = now.minute() % 10;
     }
   } else {
-    // When timer is under 10 minutes, display as MM:SS (shows real-time seconds)
+    // When timer is 59 minutes or less, display as MM:SS (shows real-time seconds)
     // Otherwise display as HH:MM (normal timer format)
-    if (remainingSeconds < 600 && remainingSeconds > 0) {
-      // LAST 9 MINUTES MODE: Display MM:SS
+    if (remainingSeconds <= 3540 && remainingSeconds > 0) {
+      // MM:SS MODE (59 minutes or less): Display MM:SS with real-time seconds
       int m = remainingSeconds / 60;
       int s = remainingSeconds % 60;
       d0 = m / 10;      // minute tens
