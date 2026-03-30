@@ -360,6 +360,34 @@ void loop() {
   updateBuzzerSequence();
   updateLCD();
   sendToSubsystem();
+  handleSerialCommands();
+}
+
+// ==================== Serial Command Handler ====================
+
+void handleSerialCommands() {
+  if (Serial.available()) {
+    String command = Serial.readStringUntil('\n');
+    command.trim();
+    command.toUpperCase();
+    
+    if (command == "MAC") {
+      Serial.println("\n========== ESP32 MAC ADDRESS ==========");
+      Serial.print("MAC Address: ");
+      Serial.println(getMacAddress());
+      Serial.println("======================================\n");
+    }
+    else if (command == "HELP") {
+      Serial.println("\n========== AVAILABLE COMMANDS ==========");
+      Serial.println("MAC   - Display ESP32 MAC Address");
+      Serial.println("HELP  - Show this help message");
+      Serial.println("======================================\n");
+    }
+    else if (command.length() > 0) {
+      Serial.println("Unknown command: " + command);
+      Serial.println("Type 'HELP' for available commands.\n");
+    }
+  }
 }
 
 // ==================== Core Functions (Same as V2) ====================
