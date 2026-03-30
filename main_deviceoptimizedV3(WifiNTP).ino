@@ -28,6 +28,8 @@ const int daylightOffset_sec = 0;         // Daylight saving offset in seconds
 
 // WiFi Connection Timeout
 const int WIFI_TIMEOUT_MS = 30000;        // 30 seconds timeout for WiFi connection
+const int NTP_TIMEOUT_MS = 600000;        // 10 minutes timeout for NTP sync
+const int NTP_QUICK_TIMEOUT_MS = 30000;   // 30 seconds - if not synced, proceed to normal mode
 unsigned long wifiStartTime = 0;
 bool wifiConnected = false;
 
@@ -370,22 +372,38 @@ void setup() {
     
     // Configure time with NTP
     Serial.println("Syncing time from NTP server...");
+    Serial.println("(Will wait up to 10 minutes or proceed after 30 seconds)");
     lcd.clear();
     lcd.print("NTP: Syncing");
     configTime(gmtOffset_sec, daylightOffset_sec, ntpServer, "time.nist.gov");
     
     // Wait for time to be set (NTP sync)
+    // Displays clock while syncing, after 30 seconds can proceed
     time_t now = time(nullptr);
-    int ntpAttempts = 0;
-    while (now < 24 * 3600 && ntpAttempts < 20) {
+    unsigned long ntpStartTime = millis();
+    unsigned long ntpQuickTime = millis();
+    bool ntpSynced = false;
+    bool proceedAfter30Sec = false;
+    
+    while (now < 24 * 3600 && (millis() - ntpStartTime) < NTP_TIMEOUT_MS) {
       delay(500);
-      Serial.print("*");
+      Serial.print(".");
       now = time(nullptr);
-      ntpAttempts++;
+      
+      // After 30 seconds without sync, proceed to normal mode but keep syncing in background
+      if ((millis() - ntpQuickTime) >= NTP_QUICK_TIMEOUT_MS && !proceedAfter30Sec) {
+        proceedAfter30Sec = true;
+        Serial.println();
+        Serial.println("30 seconds passed - proceeding to normal mode");
+        Serial.println("NTP will continue syncing in background...");
+        break;  // Exit loop and proceed to normal sequence
+      }
     }
     Serial.println();
     
+    // Check if NTP successfully synced
     if (now > 24 * 3600) {
+      ntpSynced = true;
       Serial.println("Time synchronized successfully!");
       Serial.print("Current time: ");
       Serial.println(ctime(&now));
@@ -406,8 +424,16 @@ void setup() {
       lcd.clear();
       lcd.print("NTP: SUCCESS");
       delay(2000);
+    } else if (proceedAfter30Sec) {
+      // 30 seconds passed but not synced yet
+      Serial.println("System proceeding with RTC time...");
+      Serial.println("NTP sync continues waiting for up to 10 minutes...");
+      lcd.clear();
+      lcd.print("NTP: Proceeding");
+      delay(2000);
     } else {
-      Serial.println("ERROR: NTP sync timeout!");
+      // Full 10 minutes timeout reached
+      Serial.println("ERROR: NTP sync timeout after 10 minutes!");
       lcd.clear();
       lcd.print("NTP: TIMEOUT");
       delay(2000);
@@ -421,9 +447,8 @@ void setup() {
     delay(2000);
   }
   
-  // Disconnect WiFi when done to save power
-  WiFi.disconnect(true);  // true = turn off WiFi radio
-  Serial.println("WiFi disconnected (radio off for power saving)");
+  // Keep WiFi connected for continuous access (no disconnect)
+  Serial.println("WiFi remains connected until system power-off");
   
   loadClockDigits();
   
