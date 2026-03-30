@@ -101,10 +101,18 @@ void setBCD(int val, int A, int B, int C, int D) {
   digitalWrite(D, (val >> 3) & 1);
 }
 
+void blankSegments(int A, int B, int C, int D) {
+  // Turn off all segments by setting all pins to HIGH (for common cathode decoder)
+  digitalWrite(A, HIGH);
+  digitalWrite(B, HIGH);
+  digitalWrite(C, HIGH);
+  digitalWrite(D, HIGH);
+}
+
 void showDigit(int index, int value, int A, int B, int C, int D) {
-  // Show blank (0) if in setting mode and this is the cursor position with blink off
+  // Blink OFF: blank all segments regardless of digit value
   if (settingMode && index == cursorPos && !blinkState)
-    setBCD(0, A, B, C, D);
+    blankSegments(A, B, C, D);
   else
     setBCD(value, A, B, C, D);
 }
