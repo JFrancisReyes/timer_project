@@ -29,6 +29,7 @@ bool timerRunning = false;
 
 long remainingSeconds = 0;
 unsigned long lastSecond = 0;
+unsigned long lastClockEditTime = 0;  // Grace period for clock editing
 
 bool blinkState = true;
 unsigned long blinkTimer = 0;
