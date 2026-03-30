@@ -45,15 +45,19 @@ HardwareSerial SubSerial(2);
 #define BUZZER 4
 
 // ==================== State Variables ====================
-int timerDigits[4] = {0, 0, 0, 0};
-int clockDigits[4] = {0, 0, 0, 0};
+int timerDigits[6] = {0, 0, 0, 0, 0, 0};  // HH:MM:SS
+int clockDigits[6] = {0, 0, 0, 0, 0, 0};  // HH:MM:SS
 
-int clockCursorPos = 0;  // Cursor position for clock mode (0-3)
-int timerCursorPos = 0;  // Cursor position for timer mode (0-3)
+int clockCursorPos = 0;  // Cursor position for clock mode (0-5)
+int timerCursorPos = 0;  // Cursor position for timer mode (0-5)
 int cursorPos = 0;       // Active cursor position (mirror of clock or timer)
 
 bool settingMode = false;
-bool displayClock = true;  // Start in clock mode by default
+bool displayClock = true;  // Start in clock mode by default (mode 0=clock, 1=timer, 2=alternating)
+int displayMode = 0;  // 0=static clock, 1=static timer, 2=alternating
+bool alternatingShowClock = true;  // For mode 2: tracks which display to show
+unsigned long alternatingTimer = 0;  // Timer for 5-second alternation
+const unsigned long ALTERNATING_INTERVAL = 5000;  // 5 seconds
 bool timerRunning = false;
 
 long remainingSeconds = 0;
@@ -65,7 +69,7 @@ unsigned long blinkTimer = 0;
 const int blinkInterval = 600;
 
 // Status message variables (for temporary button feedback)
-int timerStatusMessage = 0;  // 0=none, 1=paused, 2=running, 3=reset, 4=clock mode, 5=timer mode, 6=MAC address mode
+int timerStatusMessage = 0;  // 0=none, 1=paused, 2=running, 3=reset, 4=clock mode, 5=timer mode, 7=alternating mode
 unsigned long statusMessageTime = 0;
 const unsigned long MESSAGE_DURATION = 10000;  // 10 seconds
 
@@ -105,85 +109,128 @@ BuzzerNote pausePattern[] = {
 };
 const int pausePatternLen = 16;
 
-// 60-minute alert: 3 loud buzzes with 2-second delays
+// 60-minute alert: 4 beeps + pause + 4 beeps (no delay between beeps)
 BuzzerNote alert60MinPattern[] = {
-  {LOUD_TONE, 300}, {-1, 2000},
-  {LOUD_TONE, 300}, {-1, 2000},
-  {LOUD_TONE, 300}, {-1, 2000}
+  {LOUD_TONE, 300}, {-1, 50},
+  {LOUD_TONE, 300}, {-1, 50},
+  {LOUD_TONE, 300}, {-1, 50},
+  {LOUD_TONE, 300}, {-1, 1000},
+  {LOUD_TONE, 300}, {-1, 50},
+  {LOUD_TONE, 300}, {-1, 50},
+  {LOUD_TONE, 300}, {-1, 50},
+  {LOUD_TONE, 300}, {-1, 50}
 };
-const int alert60MinPatternLen = 6;
+const int alert60MinPatternLen = 16;
 
-// 45-minute alert: 2 loud buzzes with 2-second delays
+// 45-minute alert: 3 beeps + pause + 3 beeps (no delay between beeps)
 BuzzerNote alert45MinPattern[] = {
-  {LOUD_TONE, 300}, {-1, 2000},
-  {LOUD_TONE, 300}, {-1, 2000}
+  {LOUD_TONE, 300}, {-1, 50},
+  {LOUD_TONE, 300}, {-1, 50},
+  {LOUD_TONE, 300}, {-1, 1000},
+  {LOUD_TONE, 300}, {-1, 50},
+  {LOUD_TONE, 300}, {-1, 50},
+  {LOUD_TONE, 300}, {-1, 50}
 };
-const int alert45MinPatternLen = 4;
+const int alert45MinPatternLen = 12;
 
-// 30-minute alert: 4 loud buzzes with 2-second delays
+// 30-minute alert: 2 beeps + pause + 2 beeps (no delay between beeps)
 BuzzerNote alert30MinPattern[] = {
-  {LOUD_TONE, 300}, {-1, 2000},
-  {LOUD_TONE, 300}, {-1, 2000},
-  {LOUD_TONE, 300}, {-1, 2000},
-  {LOUD_TONE, 300}, {-1, 2000}
+  {LOUD_TONE, 300}, {-1, 50},
+  {LOUD_TONE, 300}, {-1, 1000},
+  {LOUD_TONE, 300}, {-1, 50},
+  {LOUD_TONE, 300}, {-1, 50}
 };
 const int alert30MinPatternLen = 8;
 
-// 15-minute alert: 3 loud beeps + 2 soft beeps with 2-second delays
+// 15-minute alert: 1 long + 3 long + pause + 1 long + 3 long
 BuzzerNote alert15MinPattern[] = {
-  {LOUD_TONE, 300}, {-1, 2000},
-  {LOUD_TONE, 300}, {-1, 2000},
-  {LOUD_TONE, 300}, {-1, 2000},
-  {LOW_TONE, 300}, {-1, 2000},
-  {LOW_TONE, 300}, {-1, 2000}
+  {LOUD_TONE, 600}, {-1, 50},
+  {LOUD_TONE, 600}, {-1, 50},
+  {LOUD_TONE, 600}, {-1, 50},
+  {LOUD_TONE, 600}, {-1, 1000},
+  {LOUD_TONE, 600}, {-1, 50},
+  {LOUD_TONE, 600}, {-1, 50},
+  {LOUD_TONE, 600}, {-1, 50},
+  {LOUD_TONE, 600}, {-1, 50}
 };
-const int alert15MinPatternLen = 10;
+const int alert15MinPatternLen = 16;
 
-// 10-minute alert: 5 loud beeps with 2-second delays
+// 10-minute alert: 1 long + 2 beeps + pause + 1 long + 2 beeps
 BuzzerNote alert10MinPattern[] = {
-  {LOUD_TONE, 300}, {-1, 2000},
-  {LOUD_TONE, 300}, {-1, 2000},
-  {LOUD_TONE, 300}, {-1, 2000},
-  {LOUD_TONE, 300}, {-1, 2000},
-  {LOUD_TONE, 300}, {-1, 2000}
+  {LOUD_TONE, 600}, {-1, 50},
+  {LOUD_TONE, 300}, {-1, 50},
+  {LOUD_TONE, 300}, {-1, 1000},
+  {LOUD_TONE, 600}, {-1, 50},
+  {LOUD_TONE, 300}, {-1, 50},
+  {LOUD_TONE, 300}, {-1, 50}
 };
-const int alert10MinPatternLen = 10;
+const int alert10MinPatternLen = 12;
 
-// 5-minute alert: 6 loud beeps with 2-second delays
+// 5-minute alert: long beep + 1 beep + pause + long beep + 1 beep
 BuzzerNote alert5MinPattern[] = {
-  {LOUD_TONE, 300}, {-1, 2000},
-  {LOUD_TONE, 300}, {-1, 2000},
-  {LOUD_TONE, 300}, {-1, 2000},
-  {LOUD_TONE, 300}, {-1, 2000},
-  {LOUD_TONE, 300}, {-1, 2000},
-  {LOUD_TONE, 300}, {-1, 2000}
+  {LOUD_TONE, 600}, {-1, 50},
+  {LOUD_TONE, 300}, {-1, 1000},
+  {LOUD_TONE, 600}, {-1, 50},
+  {LOUD_TONE, 300}, {-1, 50}
 };
-const int alert5MinPatternLen = 12;
+const int alert5MinPatternLen = 8;
 
-// 1-minute alert: 7 very loud beeps with 2-second delays
+// 1-minute alert: beep + long + beep + long + 2sec pause + beep + long + beep + long (PLAY TWICE)
 BuzzerNote alert1MinPattern[] = {
-  {VERY_LOUD_TONE, 300}, {-1, 2000},
-  {VERY_LOUD_TONE, 300}, {-1, 2000},
-  {VERY_LOUD_TONE, 300}, {-1, 2000},
-  {VERY_LOUD_TONE, 300}, {-1, 2000},
-  {VERY_LOUD_TONE, 300}, {-1, 2000},
-  {VERY_LOUD_TONE, 300}, {-1, 2000},
-  {VERY_LOUD_TONE, 300}, {-1, 2000}
+  {VERY_LOUD_TONE, 300}, {-1, 50},
+  {VERY_LOUD_TONE, 600}, {-1, 50},
+  {VERY_LOUD_TONE, 300}, {-1, 50},
+  {VERY_LOUD_TONE, 600}, {-1, 2000},
+  {VERY_LOUD_TONE, 300}, {-1, 50},
+  {VERY_LOUD_TONE, 600}, {-1, 50},
+  {VERY_LOUD_TONE, 300}, {-1, 50},
+  {VERY_LOUD_TONE, 600}, {-1, 1500},
+  // SECOND TIME
+  {VERY_LOUD_TONE, 300}, {-1, 50},
+  {VERY_LOUD_TONE, 600}, {-1, 50},
+  {VERY_LOUD_TONE, 300}, {-1, 50},
+  {VERY_LOUD_TONE, 600}, {-1, 2000},
+  {VERY_LOUD_TONE, 300}, {-1, 50},
+  {VERY_LOUD_TONE, 600}, {-1, 50},
+  {VERY_LOUD_TONE, 300}, {-1, 50},
+  {VERY_LOUD_TONE, 600}, {-1, 50}
 };
-const int alert1MinPatternLen = 14;
+const int alert1MinPatternLen = 32;
 
-// Completion alert: 5 very loud beeps, pause, then 3 very loud beeps
+// Completion alert: Selecta theme - reggae bounce (PLAY TWICE)
 BuzzerNote completionPattern[] = {
-  {VERY_LOUD_TONE, 300}, {-1, 2000},
-  {VERY_LOUD_TONE, 300}, {-1, 2000},
-  {VERY_LOUD_TONE, 300}, {-1, 2000},
-  {VERY_LOUD_TONE, 300}, {-1, 2000},
-  {VERY_LOUD_TONE, 300}, {-1, 3000},
-  {VERY_LOUD_TONE, 300}, {-1, 2000},
-  {VERY_LOUD_TONE, 300}, {-1, 2000},
-  {VERY_LOUD_TONE, 300}, {-1, 2000}
+  // SELECTA THEME - First Time
+  {HIGH_TONE, 300}, {-1, 50},
+  {LOUD_TONE, 300}, {-1, 50},
+  {HIGH_TONE, 300}, {-1, 50},
+  {LOUD_TONE, 300}, {-1, 50},
+  {HIGH_TONE, 600}, {-1, 100},
+  {LOUD_TONE, 300}, {-1, 50},
+  {HIGH_TONE, 300}, {-1, 50},
+  {LOUD_TONE, 300}, {-1, 50},
+  {HIGH_TONE, 300}, {-1, 50},
+  {LOUD_TONE, 300}, {-1, 50},
+  {HIGH_TONE, 600}, {-1, 100},
+  {LOUD_TONE, 600}, {-1, 100},
+  {HIGH_TONE, 600}, {-1, 100},
+  {VERY_LOUD_TONE, 1000}, {-1, 500},
+  // SELECTA THEME - Second Time
+  {HIGH_TONE, 300}, {-1, 50},
+  {LOUD_TONE, 300}, {-1, 50},
+  {HIGH_TONE, 300}, {-1, 50},
+  {LOUD_TONE, 300}, {-1, 50},
+  {HIGH_TONE, 600}, {-1, 100},
+  {LOUD_TONE, 300}, {-1, 50},
+  {HIGH_TONE, 300}, {-1, 50},
+  {LOUD_TONE, 300}, {-1, 50},
+  {HIGH_TONE, 300}, {-1, 50},
+  {LOUD_TONE, 300}, {-1, 50},
+  {HIGH_TONE, 600}, {-1, 100},
+  {LOUD_TONE, 600}, {-1, 100},
+  {HIGH_TONE, 600}, {-1, 100},
+  {VERY_LOUD_TONE, 1000}, {-1, 50}
 };
-const int completionPatternLen = 16;
+const int completionPatternLen = 58;
 
 int currentPatternIndex = 0;
 unsigned long patternNoteStart = 0;
@@ -345,13 +392,13 @@ void setup() {
 void loop() {
   // SAFETY CHECK: Ensure cursor positions never go out of bounds
   if (displayClock) {
-    if (clockCursorPos < 0 || clockCursorPos > 3) {
+    if (clockCursorPos < 0 || clockCursorPos > 5) {
       Serial.println("WARNING: clockCursorPos out of bounds! Resetting to 0");
       clockCursorPos = 0;
     }
     cursorPos = clockCursorPos;
   } else {
-    if (timerCursorPos < 0 || timerCursorPos > 3) {
+    if (timerCursorPos < 0 || timerCursorPos > 5) {
       Serial.println("WARNING: timerCursorPos out of bounds! Resetting to 0");
       timerCursorPos = 0;
     }
@@ -474,47 +521,67 @@ void readKeypad() {
       remainingSeconds = 0;
       buzzerActive = false;
       noTone(BUZZER);
-      for (int i = 0; i < 4; i++) timerDigits[i] = 0;
+      for (int i = 0; i < 6; i++) timerDigits[i] = 0;
       timerStatusMessage = 3;
       statusMessageTime = millis();
     }
   }
 
-  // Toggle editing mode
+  // Cycle through cursor positions in set mode
   if (key == 'C') {
-    if (settingMode && displayClock) saveClock();
-    settingMode = !settingMode;
-
-    if (settingMode) {
-      if (!displayClock && timerRunning) {
-        timerRunning = false;
-        timerStatusMessage = 1;
-        statusMessageTime = millis();
-      }
+    if (!settingMode) {
+      // Enter set mode - start at position 0
+      settingMode = true;
       if (displayClock) {
         clockCursorPos = 0;
         cursorPos = clockCursorPos;
         loadClockDigits();
       } else {
+        if (timerRunning) {
+          timerRunning = false;
+          timerStatusMessage = 1;
+          statusMessageTime = millis();
+        }
         timerCursorPos = 0;
         cursorPos = timerCursorPos;
+      }
+    } else {
+      // In set mode: cycle through positions (0→1→2→3→4→5→exit)
+      if (cursorPos < 5) {
+        // Move to next position
+        moveCursorRight();
+      } else {
+        // Exit set mode when at position 5
+        if (displayClock) saveClock();
+        settingMode = false;
       }
     }
   }
 
-  // Switch between clock and timer display
+  // Switch between display modes: Clock -> Timer -> Alternating -> Clock
   if (key == 'D') {
     if (settingMode) {
       settingMode = false;
     } else {
-      displayClock = !displayClock;
-      if (displayClock) {
+      displayMode = (displayMode + 1) % 3;  // Cycle through 0, 1, 2
+      
+      if (displayMode == 0) {
+        // Static Clock Mode
+        displayClock = true;
         cursorPos = clockCursorPos;
         loadClockDigits();
-        timerStatusMessage = 4;
-      } else {
+        timerStatusMessage = 4;  // "CLOCK MODE"
+      } else if (displayMode == 1) {
+        // Static Timer Mode
+        displayClock = false;
         cursorPos = timerCursorPos;
-        timerStatusMessage = 5;
+        timerStatusMessage = 5;  // "TIMER MODE"
+      } else if (displayMode == 2) {
+        // Alternating Mode - starts with clock
+        displayClock = true;
+        alternatingShowClock = true;
+        alternatingTimer = millis();
+        timerStatusMessage = 7;  // "CLOCK/TIMER"
       }
       statusMessageTime = millis();
     }
@@ -527,43 +594,52 @@ void loadClockDigits() {
   clockDigits[1] = now.hour() % 10;
   clockDigits[2] = now.minute() / 10;
   clockDigits[3] = now.minute() % 10;
+  clockDigits[4] = now.second() / 10;
+  clockDigits[5] = now.second() % 10;
 }
 
 void saveClock() {
   DateTime now = rtc.now();
   int h = clockDigits[0] * 10 + clockDigits[1];
   int m = clockDigits[2] * 10 + clockDigits[3];
-  rtc.adjust(DateTime(now.year(), now.month(), now.day(), h, m, 0));
+  int s = clockDigits[4] * 10 + clockDigits[5];
+  rtc.adjust(DateTime(now.year(), now.month(), now.day(), h, m, s));
 }
 
 bool validTimerDigit(int pos, int value) {
-  if (pos == 0) return value <= 2;
+  if (pos == 0) return value <= 2;  // Hour tens: 0-2
   if (pos == 1) {
-    if (timerDigits[0] == 2) return value <= 3;
-    return true;
+    if (timerDigits[0] == 2) return value <= 3;  // Hour ones: 0-3 if tens=2
+    return true;  // Hour ones: 0-9 otherwise
   }
-  if (pos == 2) return value <= 5;
-  return true;
+  if (pos == 2) return value <= 5;  // Minute tens: 0-5
+  if (pos == 3) return true;  // Minute ones: 0-9
+  if (pos == 4) return value <= 5;  // Second tens: 0-5
+  if (pos == 5) return true;  // Second ones: 0-9
+  return false;
 }
 
 bool validClockDigit(int pos, int value) {
-  if (pos == 0) return value <= 2;
+  if (pos == 0) return value <= 2;  // Hour tens: 0-2
   if (pos == 1) {
-    if (clockDigits[0] == 2) return value <= 3;
-    return true;
+    if (clockDigits[0] == 2) return value <= 3;  // Hour ones: 0-3 if tens=2
+    return true;  // Hour ones: 0-9 otherwise
   }
-  if (pos == 2) return value <= 5;
-  return true;
+  if (pos == 2) return value <= 5;  // Minute tens: 0-5
+  if (pos == 3) return true;  // Minute ones: 0-9
+  if (pos == 4) return value <= 5;  // Second tens: 0-5
+  if (pos == 5) return true;  // Second ones: 0-9
+  return false;
 }
 
 void moveCursorRight() {
   if (displayClock) {
     clockCursorPos++;
-    if (clockCursorPos > 3) clockCursorPos = 3;
+    if (clockCursorPos > 5) clockCursorPos = 5;  // Max position 5
     cursorPos = clockCursorPos;
   } else {
     timerCursorPos++;
-    if (timerCursorPos > 3) timerCursorPos = 3;
+    if (timerCursorPos > 5) timerCursorPos = 5;  // Max position 5
     cursorPos = timerCursorPos;
   }
 }
@@ -571,11 +647,11 @@ void moveCursorRight() {
 void moveCursorLeft() {
   if (displayClock) {
     clockCursorPos--;
-    if (clockCursorPos < 0) clockCursorPos = 0;
+    if (clockCursorPos < 0) clockCursorPos = 0;  // Min position 0
     cursorPos = clockCursorPos;
   } else {
     timerCursorPos--;
-    if (timerCursorPos < 0) timerCursorPos = 0;
+    if (timerCursorPos < 0) timerCursorPos = 0;  // Min position 0
     cursorPos = timerCursorPos;
   }
 }
@@ -583,7 +659,8 @@ void moveCursorLeft() {
 long getTimerSeconds() {
   int h = timerDigits[0] * 10 + timerDigits[1];
   int m = timerDigits[2] * 10 + timerDigits[3];
-  return h * 3600L + m * 60L;
+  int s = timerDigits[4] * 10 + timerDigits[5];
+  return h * 3600L + m * 60L + s;
 }
 
 void convert24to12(int hour24, int &hour12, bool &isPM) {
@@ -608,11 +685,14 @@ void updateTimer() {
 
       int h = remainingSeconds / 3600;
       int m = (remainingSeconds % 3600) / 60;
+      int s = remainingSeconds % 60;
 
       timerDigits[0] = h / 10;
       timerDigits[1] = h % 10;
       timerDigits[2] = m / 10;
       timerDigits[3] = m % 10;
+      timerDigits[4] = s / 10;
+      timerDigits[5] = s % 10;
 
       // Check for 60-minute threshold (3600 seconds)
       if (remainingSeconds == 3600 && !alert60MinTriggered) {
@@ -707,7 +787,7 @@ String getMacAddress() {
 }
 
 void printDigit(int pos, int value) {
-  int lcdPos[4] = {2, 3, 5, 6};
+  int lcdPos[6] = {2, 3, 5, 6, 8, 9};  // HH:MM:SS column positions
   lcd.setCursor(lcdPos[pos], 0);
 
   if (settingMode && pos == cursorPos && !blinkState)
@@ -717,6 +797,16 @@ void printDigit(int pos, int value) {
 }
 
 void updateLCD() {
+  // Handle alternating mode timing
+  if (displayMode == 2) {
+    if (millis() - alternatingTimer >= ALTERNATING_INTERVAL) {
+      alternatingShowClock = !alternatingShowClock;
+      alternatingTimer = millis();
+    }
+    // Update displayClock for alternating mode
+    displayClock = alternatingShowClock;
+  }
+  
   lcd.setCursor(0, 0);
 
   if (displayClock) {
@@ -726,6 +816,7 @@ void updateLCD() {
 
     int h = settingMode ? clockDigits[0] * 10 + clockDigits[1] : now.hour();
     int m = settingMode ? clockDigits[2] * 10 + clockDigits[3] : now.minute();
+    int s = settingMode ? clockDigits[4] * 10 + clockDigits[5] : now.second();
 
     int h12;
     bool isPM;
@@ -742,8 +833,8 @@ void updateLCD() {
 
     lcd.print(":");
 
-    if (now.second() < 10) lcd.print("0");
-    lcd.print(now.second());
+    printDigit(4, s / 10);
+    printDigit(5, s % 10);
   } else {
     lcd.print("T ");
 
@@ -758,10 +849,10 @@ void updateLCD() {
 
     lcd.print(":");
 
-    int sec = remainingSeconds % 60;
+    int sec = settingMode ? (timerDigits[4] * 10 + timerDigits[5]) : (remainingSeconds % 60);
 
-    if (sec < 10) lcd.print("0");
-    lcd.print(sec);
+    printDigit(4, sec / 10);
+    printDigit(5, sec % 10);
 
     lcd.setCursor(15, 0);
 
@@ -788,6 +879,8 @@ void updateLCD() {
     lcd.print("CLOCK MODE      ");
   } else if (timerStatusMessage == 5) {
     lcd.print("TIMER MODE      ");
+  } else if (timerStatusMessage == 7) {
+    lcd.print("CLOCK/TIMER     ");
   } else {
     lcd.print("                ");
   }
