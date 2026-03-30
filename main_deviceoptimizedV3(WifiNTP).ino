@@ -334,6 +334,10 @@ void setup() {
   loadClockDigits();
   
   Serial.println("========== SETUP COMPLETE ==========\n");
+  Serial.println("Serial Commands Available:");
+  Serial.println("  Type 'MAC' to display ESP32 MAC address");
+  Serial.println("  Type 'HELP' for more information");
+  Serial.println("Send commands followed by Enter.\n");
   lcd.clear();
 }
 
@@ -369,7 +373,19 @@ void handleSerialCommands() {
   if (Serial.available()) {
     String command = Serial.readStringUntil('\n');
     command.trim();
+    
+    // Remove any carriage returns
+    command.replace("\r", "");
+    
+    // Convert to uppercase for case-insensitive comparison
     command.toUpperCase();
+    
+    // Debug: Show what was received
+    if (command.length() > 0) {
+      Serial.print("[DEBUG] Command received: '");
+      Serial.print(command);
+      Serial.println("'");
+    }
     
     if (command == "MAC") {
       Serial.println("\n========== ESP32 MAC ADDRESS ==========");
@@ -385,7 +401,7 @@ void handleSerialCommands() {
     }
     else if (command.length() > 0) {
       Serial.println("Unknown command: " + command);
-      Serial.println("Type 'HELP' for available commands.\n");
+      Serial.println("Type 'MAC' or 'HELP'.\n");
     }
   }
 }
