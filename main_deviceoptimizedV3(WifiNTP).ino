@@ -197,40 +197,87 @@ BuzzerNote alert1MinPattern[] = {
 };
 const int alert1MinPatternLen = 32;
 
-// Completion alert: Selecta theme - reggae bounce (PLAY TWICE)
+// Completion alert: Two long beeps, pause, two long beeps, then 3-beep sequence repeated 10x
 BuzzerNote completionPattern[] = {
-  // SELECTA THEME - First Time
-  {HIGH_TONE, 300}, {-1, 50},
+  // First sequence (plays once)
+  {LOUD_TONE, 1000}, {-1, 50},
+  {LOUD_TONE, 1000}, {-1, 2000},
+  {LOUD_TONE, 1000}, {-1, 50},
+  {LOUD_TONE, 1000}, {-1, 2000},
+  
+  // Second sequence (3 beeps + pause + 3 beeps, repeated 10x)
+  // Repetition 1
   {LOUD_TONE, 300}, {-1, 50},
-  {HIGH_TONE, 300}, {-1, 50},
   {LOUD_TONE, 300}, {-1, 50},
-  {HIGH_TONE, 600}, {-1, 100},
+  {LOUD_TONE, 300}, {-1, 2000},
   {LOUD_TONE, 300}, {-1, 50},
-  {HIGH_TONE, 300}, {-1, 50},
   {LOUD_TONE, 300}, {-1, 50},
-  {HIGH_TONE, 300}, {-1, 50},
   {LOUD_TONE, 300}, {-1, 50},
-  {HIGH_TONE, 600}, {-1, 100},
-  {LOUD_TONE, 600}, {-1, 100},
-  {HIGH_TONE, 600}, {-1, 100},
-  {VERY_LOUD_TONE, 1000}, {-1, 500},
-  // SELECTA THEME - Second Time
-  {HIGH_TONE, 300}, {-1, 50},
+  // Repetition 2
   {LOUD_TONE, 300}, {-1, 50},
-  {HIGH_TONE, 300}, {-1, 50},
   {LOUD_TONE, 300}, {-1, 50},
-  {HIGH_TONE, 600}, {-1, 100},
+  {LOUD_TONE, 300}, {-1, 2000},
   {LOUD_TONE, 300}, {-1, 50},
-  {HIGH_TONE, 300}, {-1, 50},
   {LOUD_TONE, 300}, {-1, 50},
-  {HIGH_TONE, 300}, {-1, 50},
   {LOUD_TONE, 300}, {-1, 50},
-  {HIGH_TONE, 600}, {-1, 100},
-  {LOUD_TONE, 600}, {-1, 100},
-  {HIGH_TONE, 600}, {-1, 100},
-  {VERY_LOUD_TONE, 1000}, {-1, 50}
+  // Repetition 3
+  {LOUD_TONE, 300}, {-1, 50},
+  {LOUD_TONE, 300}, {-1, 50},
+  {LOUD_TONE, 300}, {-1, 2000},
+  {LOUD_TONE, 300}, {-1, 50},
+  {LOUD_TONE, 300}, {-1, 50},
+  {LOUD_TONE, 300}, {-1, 50},
+  // Repetition 4
+  {LOUD_TONE, 300}, {-1, 50},
+  {LOUD_TONE, 300}, {-1, 50},
+  {LOUD_TONE, 300}, {-1, 2000},
+  {LOUD_TONE, 300}, {-1, 50},
+  {LOUD_TONE, 300}, {-1, 50},
+  {LOUD_TONE, 300}, {-1, 50},
+  // Repetition 5
+  {LOUD_TONE, 300}, {-1, 50},
+  {LOUD_TONE, 300}, {-1, 50},
+  {LOUD_TONE, 300}, {-1, 2000},
+  {LOUD_TONE, 300}, {-1, 50},
+  {LOUD_TONE, 300}, {-1, 50},
+  {LOUD_TONE, 300}, {-1, 50},
+  // Repetition 6
+  {LOUD_TONE, 300}, {-1, 50},
+  {LOUD_TONE, 300}, {-1, 50},
+  {LOUD_TONE, 300}, {-1, 2000},
+  {LOUD_TONE, 300}, {-1, 50},
+  {LOUD_TONE, 300}, {-1, 50},
+  {LOUD_TONE, 300}, {-1, 50},
+  // Repetition 7
+  {LOUD_TONE, 300}, {-1, 50},
+  {LOUD_TONE, 300}, {-1, 50},
+  {LOUD_TONE, 300}, {-1, 2000},
+  {LOUD_TONE, 300}, {-1, 50},
+  {LOUD_TONE, 300}, {-1, 50},
+  {LOUD_TONE, 300}, {-1, 50},
+  // Repetition 8
+  {LOUD_TONE, 300}, {-1, 50},
+  {LOUD_TONE, 300}, {-1, 50},
+  {LOUD_TONE, 300}, {-1, 2000},
+  {LOUD_TONE, 300}, {-1, 50},
+  {LOUD_TONE, 300}, {-1, 50},
+  {LOUD_TONE, 300}, {-1, 50},
+  // Repetition 9
+  {LOUD_TONE, 300}, {-1, 50},
+  {LOUD_TONE, 300}, {-1, 50},
+  {LOUD_TONE, 300}, {-1, 2000},
+  {LOUD_TONE, 300}, {-1, 50},
+  {LOUD_TONE, 300}, {-1, 50},
+  {LOUD_TONE, 300}, {-1, 50},
+  // Repetition 10
+  {LOUD_TONE, 300}, {-1, 50},
+  {LOUD_TONE, 300}, {-1, 50},
+  {LOUD_TONE, 300}, {-1, 2000},
+  {LOUD_TONE, 300}, {-1, 50},
+  {LOUD_TONE, 300}, {-1, 50},
+  {LOUD_TONE, 300}, {-1, 50}
 };
-const int completionPatternLen = 58;
+const int completionPatternLen = 70;
 
 int currentPatternIndex = 0;
 unsigned long patternNoteStart = 0;
