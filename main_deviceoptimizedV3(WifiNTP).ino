@@ -53,7 +53,7 @@ int timerCursorPos = 0;  // Cursor position for timer mode (0-3)
 int cursorPos = 0;       // Active cursor position (mirror of clock or timer)
 
 bool settingMode = false;
-bool displayClock = true;  // Start in clock mode by default
+int displayMode = 0;  // 0=clock, 1=timer, 2=MAC address
 bool timerRunning = false;
 
 long remainingSeconds = 0;
@@ -65,7 +65,7 @@ unsigned long blinkTimer = 0;
 const int blinkInterval = 600;
 
 // Status message variables (for temporary button feedback)
-int timerStatusMessage = 0;  // 0=none, 1=paused, 2=running, 3=reset, 4=clock mode, 5=timer mode
+int timerStatusMessage = 0;  // 0=none, 1=paused, 2=running, 3=reset, 4=clock mode, 5=timer mode, 6=MAC address mode
 unsigned long statusMessageTime = 0;
 const unsigned long MESSAGE_DURATION = 10000;  // 10 seconds
 
@@ -340,13 +340,13 @@ void setup() {
 // ==================== Main Loop ====================
 void loop() {
   // SAFETY CHECK: Ensure cursor positions never go out of bounds
-  if (displayClock) {
+  if (displayMode == 0) {
     if (clockCursorPos < 0 || clockCursorPos > 3) {
       Serial.println("WARNING: clockCursorPos out of bounds! Resetting to 0");
       clockCursorPos = 0;
     }
     cursorPos = clockCursorPos;
-  } else {
+  } else if (displayMode == 1) {
     if (timerCursorPos < 0 || timerCursorPos > 3) {
       Serial.println("WARNING: timerCursorPos out of bounds! Resetting to 0");
       timerCursorPos = 0;
@@ -379,12 +379,12 @@ void readKeypad() {
   if (key >= '0' && key <= '9' && settingMode) {
     int value = key - '0';
 
-    if (displayClock) {
+    if (displayMode == 0) {
       if (validClockDigit(clockCursorPos, value)) {
         clockDigits[clockCursorPos] = value;
         moveCursorRight();
       }
-    } else {
+    } else if (displayMode == 1) {
       if (validTimerDigit(timerCursorPos, value)) {
         timerDigits[timerCursorPos] = value;
         moveCursorRight();
@@ -396,7 +396,7 @@ void readKeypad() {
   if (key == '#' && settingMode) moveCursorRight();
 
   // Timer control: Start/Pause
-  if (key == 'A' && !displayClock) {
+  if (key == 'A' && displayMode == 1) {
     if (!timerRunning) {
       if (remainingSeconds == 0) {
         remainingSeconds = getTimerSeconds();
@@ -438,39 +438,42 @@ void readKeypad() {
 
   // Toggle editing mode
   if (key == 'C') {
-    if (settingMode && displayClock) saveClock();
+    if (settingMode && displayMode == 0) saveClock();
     settingMode = !settingMode;
 
     if (settingMode) {
-      if (!displayClock && timerRunning) {
+      if (displayMode == 1 && timerRunning) {
         timerRunning = false;
         timerStatusMessage = 1;
         statusMessageTime = millis();
       }
-      if (displayClock) {
+      if (displayMode == 0) {
         clockCursorPos = 0;
         cursorPos = clockCursorPos;
         loadClockDigits();
-      } else {
+      } else if (displayMode == 1) {
         timerCursorPos = 0;
         cursorPos = timerCursorPos;
       }
     }
   }
 
-  // Switch between clock and timer display
+  // Cycle through display modes: Clock -> Timer -> MAC Address -> Clock
   if (key == 'D') {
     if (settingMode) {
       settingMode = false;
     } else {
-      displayClock = !displayClock;
-      if (displayClock) {
+      displayMode = (displayMode + 1) % 3;  // Cycle through 0, 1, 2
+      
+      if (displayMode == 0) {
         cursorPos = clockCursorPos;
         loadClockDigits();
-        timerStatusMessage = 4;
-      } else {
+        timerStatusMessage = 4;  // "CLOCK MODE"
+      } else if (displayMode == 1) {
         cursorPos = timerCursorPos;
-        timerStatusMessage = 5;
+        timerStatusMessage = 5;  // "TIMER MODE"
+      } else if (displayMode == 2) {
+        timerStatusMessage = 6;  // "MAC ADDRESS"
       }
       statusMessageTime = millis();
     }
@@ -513,11 +516,11 @@ bool validClockDigit(int pos, int value) {
 }
 
 void moveCursorRight() {
-  if (displayClock) {
+  if (displayMode == 0) {
     clockCursorPos++;
     if (clockCursorPos > 3) clockCursorPos = 3;
     cursorPos = clockCursorPos;
-  } else {
+  } else if (displayMode == 1) {
     timerCursorPos++;
     if (timerCursorPos > 3) timerCursorPos = 3;
     cursorPos = timerCursorPos;
@@ -525,11 +528,11 @@ void moveCursorRight() {
 }
 
 void moveCursorLeft() {
-  if (displayClock) {
+  if (displayMode == 0) {
     clockCursorPos--;
     if (clockCursorPos < 0) clockCursorPos = 0;
     cursorPos = clockCursorPos;
-  } else {
+  } else if (displayMode == 1) {
     timerCursorPos--;
     if (timerCursorPos < 0) timerCursorPos = 0;
     cursorPos = timerCursorPos;
@@ -650,6 +653,18 @@ void updateTimer() {
   }
 }
 
+String getMacAddress() {
+  uint8_t mac[6];
+  WiFi.macAddress(mac);
+  String macStr = "";
+  for (int i = 0; i < 6; i++) {
+    if (mac[i] < 16) macStr += "0";
+    macStr += String(mac[i], HEX);
+    if (i < 5) macStr += ":";
+  }
+  return macStr;
+}
+
 void printDigit(int pos, int value) {
   int lcdPos[4] = {2, 3, 5, 6};
   lcd.setCursor(lcdPos[pos], 0);
@@ -663,7 +678,8 @@ void printDigit(int pos, int value) {
 void updateLCD() {
   lcd.setCursor(0, 0);
 
-  if (displayClock) {
+  if (displayMode == 0) {
+    // Clock Mode
     DateTime now = rtc.now();
 
     lcd.print("C ");
@@ -688,7 +704,8 @@ void updateLCD() {
 
     if (now.second() < 10) lcd.print("0");
     lcd.print(now.second());
-  } else {
+  } else if (displayMode == 1) {
+    // Timer Mode
     lcd.print("T ");
 
     printDigit(0, timerDigits[0]);
@@ -711,6 +728,12 @@ void updateLCD() {
 
     if (timerRunning) lcd.print("G");
     else lcd.print("P");
+  } else if (displayMode == 2) {
+    // MAC Address Display Mode
+    lcd.print("MAC:");
+    String macAddr = getMacAddress();
+    // Display first 12 characters (enough for MAC address)
+    lcd.print(macAddr.substring(0, 12));
   }
 
   // Display bottom row: SET MODE or Status Message or blank
@@ -732,6 +755,8 @@ void updateLCD() {
     lcd.print("CLOCK MODE      ");
   } else if (timerStatusMessage == 5) {
     lcd.print("TIMER MODE      ");
+  } else if (timerStatusMessage == 6) {
+    lcd.print("MAC ADDRESS     ");
   } else {
     lcd.print("                ");
   }
@@ -740,7 +765,7 @@ void updateLCD() {
 void sendToSubsystem() {
   int d0, d1, d2, d3;
 
-  if (displayClock) {
+  if (displayMode == 0) {
     if (settingMode) {
       d0 = clockDigits[0];
       d1 = clockDigits[1];
@@ -756,11 +781,17 @@ void sendToSubsystem() {
       d2 = now.minute() / 10;
       d3 = now.minute() % 10;
     }
-  } else {
+  } else if (displayMode == 1) {
     d0 = timerDigits[0];
     d1 = timerDigits[1];
     d2 = timerDigits[2];
     d3 = timerDigits[3];
+  } else {
+    // MAC address mode - send zeros to subsystem
+    d0 = 0;
+    d1 = 0;
+    d2 = 0;
+    d3 = 0;
   }
 
   SubSerial.print(d0);
