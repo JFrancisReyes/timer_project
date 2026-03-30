@@ -483,8 +483,36 @@ void readKeypad() {
     }
   }
 
-  if (key == '*' && settingMode) moveCursorLeft();
-  if (key == '#' && settingMode) moveCursorRight();
+  // Cursor navigation with wrap-around
+  if (key == '*' && settingMode) {
+    if (cursorPos == 0) {
+      // At leftmost position (hour tens), wrap to rightmost (second ones)
+      if (displayClock) {
+        clockCursorPos = 5;
+        cursorPos = 5;
+      } else {
+        timerCursorPos = 5;
+        cursorPos = 5;
+      }
+    } else {
+      moveCursorLeft();
+    }
+  }
+  
+  if (key == '#' && settingMode) {
+    if (cursorPos == 5) {
+      // At rightmost position (second ones), wrap to leftmost (hour tens)
+      if (displayClock) {
+        clockCursorPos = 0;
+        cursorPos = 0;
+      } else {
+        timerCursorPos = 0;
+        cursorPos = 0;
+      }
+    } else {
+      moveCursorRight();
+    }
+  }
 
   // Timer control: Start/Pause
   if (key == 'A' && !displayClock) {
