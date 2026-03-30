@@ -8,12 +8,12 @@
 
 // ==================== WiFi Configuration ====================
 // IMPORTANT: Replace with YOUR credentials
-const char* ssid = "YOUR_SSID";           // Your WiFi network name
-const char* password = "YOUR_PASSWORD";   // Your WiFi password
+const char* ssid = "Infinix_Note_30";           // Your WiFi network name
+const char* password = "yayeet3466";   // Your WiFi password
 
 // NTP Server Configuration
 const char* ntpServer = "pool.ntp.org";
-const long gmtOffset_sec = 0;             // UTC offset in seconds (0 for UTC)
+const long gmtOffset_sec = 28800;             // UTC offset in seconds (0 for UTC)
 const int daylightOffset_sec = 0;         // Daylight saving offset in seconds
 
 // Timezone Examples:
@@ -813,10 +813,23 @@ void sendToSubsystem() {
       d3 = now.minute() % 10;
     }
   } else {
-    d0 = timerDigits[0];
-    d1 = timerDigits[1];
-    d2 = timerDigits[2];
-    d3 = timerDigits[3];
+    // When timer is under 10 minutes, display as MM:SS (shows real-time seconds)
+    // Otherwise display as HH:MM (normal timer format)
+    if (remainingSeconds < 600 && remainingSeconds > 0) {
+      // LAST 9 MINUTES MODE: Display MM:SS
+      int m = remainingSeconds / 60;
+      int s = remainingSeconds % 60;
+      d0 = m / 10;      // minute tens
+      d1 = m % 10;      // minute ones
+      d2 = s / 10;      // second tens
+      d3 = s % 10;      // second ones
+    } else {
+      // NORMAL MODE: Display HH:MM
+      d0 = timerDigits[0];  // hour tens
+      d1 = timerDigits[1];  // hour ones
+      d2 = timerDigits[2];  // minute tens
+      d3 = timerDigits[3];  // minute ones
+    }
   }
 
   SubSerial.print(d0);
