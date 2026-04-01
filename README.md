@@ -10,6 +10,6 @@ Project: Classroom Timer Project
 <br>Reyes, John Francis O.
 <br>Sumogba, Klint John
 
-<br>The Files associated with our Project is Optimized Main System V3 and Subsystem Optimized
+<br><i><b>The Files associated with our Project is Optimized Main System V3 and Subsystem Optimized</b></i>
 
 <p><b>This Project is for a Digital Electronics 2 Subject which requires a buzzer and clock function built into the device that you can alongside its main function of having a countdown timer</b></p>
