@@ -2,13 +2,13 @@
 Project: Classroom Timer Project
 (BSECE-3A)
 <br>ROOM : 211
-Cabase, Marl Jordie
-Demain, Jerson M.
-Guardiano, Jerilyn A.
-Ilumin, Jerilyn-An L.
-Miranda, John Benedict M.
-Reyes, John Francis O.
-Sumogba, Klint John
+<br>Cabase, Marl Jordie
+<br>Demain, Jerson M.
+<br>Guardiano, Jerilyn A.
+<br>Ilumin, Jerilyn-An L.
+<br>Miranda, John Benedict M.
+<br>Reyes, John Francis O.
+<br>Sumogba, Klint John
 
 
 
