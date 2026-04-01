@@ -11,6 +11,4 @@ Project: Classroom Timer Project
 <br>Sumogba, Klint John
 
 
-
- 
-# This Project is for a Digital Electronics 2 Subject which requires a buzzer and clock function built into the device that you can alongside its main function of having a countdown timer
+<p>This Project is for a Digital Electronics 2 Subject which requires a buzzer and clock function built into the device that you can alongside its main function of having a countdown timer</p>
